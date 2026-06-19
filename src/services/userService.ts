@@ -1,5 +1,8 @@
 import { getClerkClient } from '../integrations/clerkAuth';
+import { deleteUserUploads } from '../integrations/supabaseStorage';
 import * as accountRepository from '../repositories/accountRepository';
+import * as preferencesRepository from '../repositories/preferencesRepository';
+import * as userDataRepository from '../repositories/userDataRepository';
 import * as userRepository from '../repositories/userRepository';
 import type { MeResponse, UserRecord } from '../types/domain/user';
 
@@ -82,7 +85,7 @@ export async function ensureUser(clerkUserId: string): Promise<UserRecord> {
 }
 
 export async function getMe(clerkUserId: string): Promise<MeResponse> {
-  const user = await ensureUser(clerkUserId);
+  const user = await ensureValidAvatar(await ensureUser(clerkUserId), clerkUserId);
   return toMeResponse(user);
 }
 
@@ -128,6 +131,34 @@ function toMeResponse(user: UserRecord): MeResponse {
       avatarUrl: user.avatarUrl,
     },
   };
+}
+
+async function ensureValidAvatar(user: UserRecord, clerkUserId: string): Promise<UserRecord> {
+  const avatarUrl = user.avatarUrl?.trim();
+  if (!avatarUrl) {
+    return user;
+  }
+
+  try {
+    const response = await fetch(avatarUrl, { method: 'HEAD' });
+    if (response.ok) {
+      return user;
+    }
+  } catch {
+    return user;
+  }
+
+  return userRepository.updateUser(clerkUserId, { avatarUrl: null });
+}
+
+/** Wipes all expense data for the signed-in user while keeping their account. */
+export async function wipeUserData(clerkUserId: string): Promise<void> {
+  const user = await ensureUser(clerkUserId);
+  await userDataRepository.deleteAllUserData(user.id);
+  await deleteUserUploads(clerkUserId);
+  await userRepository.updateUser(clerkUserId, { avatarUrl: null });
+  await seedDefaultAccounts(user.id);
+  await preferencesRepository.getOrCreatePreferences(user.id);
 }
 
 /** Idempotent cleanup when Clerk deletes a user (webhook). Cascades child rows via FK. */

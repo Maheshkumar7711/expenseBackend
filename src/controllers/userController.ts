@@ -12,3 +12,8 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
   const me = await userService.updateProfile(req.auth!.userId, body);
   res.status(200).json({ data: me });
 }
+
+export async function wipeMyData(req: Request, res: Response): Promise<void> {
+  await userService.wipeUserData(req.auth!.userId);
+  res.status(204).send();
+}

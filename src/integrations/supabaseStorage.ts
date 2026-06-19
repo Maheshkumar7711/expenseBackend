@@ -103,3 +103,27 @@ async function uploadToBucket(
 
   return { path, url: data.signedUrl };
 }
+
+/** Best-effort removal of uploaded receipts and avatars for a Clerk user. */
+export async function deleteUserUploads(clerkUserId: string): Promise<void> {
+  for (const bucket of [RECEIPTS_BUCKET, AVATARS_BUCKET]) {
+    const { data: files, error: listError } = await getSupabaseAdmin()
+      .storage.from(bucket)
+      .list(clerkUserId, { limit: 1000 });
+
+    if (listError) {
+      wrapStorageError(listError);
+    }
+
+    if (!files?.length) {
+      continue;
+    }
+
+    const paths = files.map((file) => `${clerkUserId}/${file.name}`);
+    const { error: removeError } = await getSupabaseAdmin().storage.from(bucket).remove(paths);
+
+    if (removeError) {
+      wrapStorageError(removeError);
+    }
+  }
+}

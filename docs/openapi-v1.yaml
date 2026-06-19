@@ -94,6 +94,20 @@ paths:
         '401':
           description: Unauthorized
 
+  /api/v1/me/data:
+    delete:
+      tags: [Me]
+      summary: Wipe all user expense data from the server
+      description: |
+        Deletes transactions, accounts, budgets, goals, events, reminders, categories,
+        and preferences for the authenticated user. The user profile row is preserved;
+        default accounts and preferences are recreated.
+      responses:
+        '204':
+          description: Data wiped
+        '401':
+          description: Unauthorized
+
   /api/v1/me/preferences:
     get:
       tags: [Preferences]
