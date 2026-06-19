@@ -1,0 +1,20 @@
+title = "Expense Backend Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlisted non-secret placeholders"
+paths = [
+  '''\.env\.example$''',
+  '''scripts/scan-secrets\.mjs$''',
+  '''\.cursor/rules/''',
+]
+
+[[rules.allowlists]]
+description = "Empty env placeholders"
+regexTarget = "match"
+regexes = [
+  '''(?i)(secret|key|password|token)\s*=\s*$''',
+  '''YOUR_[A-Z_]+''',
+]

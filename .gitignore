@@ -5,3 +5,9 @@ dist/
 *.log
 .DS_Store
 coverage/
+
+#cursor
+.cursor
+
+#tests
+tests

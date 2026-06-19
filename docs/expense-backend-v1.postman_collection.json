@@ -1,0 +1,136 @@
+{
+  "info": {
+    "name": "Expense Backend v1",
+    "description": "Import into Postman. Set `baseUrl` and `token` (Clerk JWT) in environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          }
+        },
+        {
+          "name": "Ready (dev)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/ready"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Me",
+      "item": [
+        {
+          "name": "Get me",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/me" }
+        },
+        {
+          "name": "Update me",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\",\n  \"hasCompletedOnboarding\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/me"
+          }
+        },
+        {
+          "name": "Get preferences",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/me/preferences" }
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "List accounts",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/accounts" }
+        },
+        {
+          "name": "Create account",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"bank\",\n  \"name\": \"HBL\",\n  \"openingBalance\": 1000\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/accounts"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "List transactions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "transactions"],
+              "query": [{ "key": "limit", "value": "20" }]
+            }
+          }
+        },
+        {
+          "name": "Create expense",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionType\": \"expense\",\n  \"amount\": 250,\n  \"categoryKey\": \"food_drink\",\n  \"selectedAccount\": \"cash\",\n  \"date\": \"2026-06-18T10:00:00.000Z\",\n  \"tags\": []\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/transactions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Uploads",
+      "item": [
+        {
+          "name": "Upload receipt",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": "" }]
+            },
+            "url": "{{baseUrl}}/api/v1/uploads/receipts"
+          }
+        },
+        {
+          "name": "Upload avatar",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": "" }]
+            },
+            "url": "{{baseUrl}}/api/v1/uploads/avatars"
+          }
+        }
+      ]
+    }
+  ]
+}

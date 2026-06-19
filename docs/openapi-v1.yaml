@@ -1,0 +1,340 @@
+openapi: 3.0.3
+info:
+  title: Expense Tracker API
+  version: 1.0.0
+  description: REST API for the Expense Tracker mobile app. Auth via Clerk Bearer JWT.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Public
+  - name: Me
+  - name: Accounts
+  - name: Transactions
+  - name: Budgets
+  - name: Goals
+  - name: Events
+  - name: Reminders
+  - name: Categories
+  - name: Preferences
+  - name: Uploads
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items: {}
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Public]
+      security: []
+      summary: Liveness probe
+      responses:
+        '200':
+          description: OK
+
+  /api/v1/me:
+    get:
+      tags: [Me]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: Profile
+        '401':
+          description: Unauthorized
+    patch:
+      tags: [Me]
+      summary: Update profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                dateOfBirth: { type: string }
+                userType:
+                  type: string
+                  enum: [Student, Professional, Self Employed, Retired]
+                gender:
+                  type: string
+                  enum: [Male, Female]
+                avatarUrl: { type: string, nullable: true }
+                hasCompletedOnboarding: { type: boolean }
+      responses:
+        '200':
+          description: Updated profile
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+
+  /api/v1/me/preferences:
+    get:
+      tags: [Preferences]
+      summary: Get user preferences
+      responses:
+        '200':
+          description: Preferences
+    patch:
+      tags: [Preferences]
+      summary: Update preferences
+      responses:
+        '200':
+          description: Updated preferences
+
+  /api/v1/accounts:
+    get:
+      tags: [Accounts]
+      summary: List accounts
+      responses:
+        '200':
+          description: Accounts list with deletedAccountNames
+    post:
+      tags: [Accounts]
+      summary: Create account
+      responses:
+        '201':
+          description: Created
+
+  /api/v1/accounts/{id}:
+    get:
+      tags: [Accounts]
+      summary: Get account by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Account
+        '404':
+          description: Not found
+    patch:
+      tags: [Accounts]
+      summary: Update account
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Updated
+    delete:
+      tags: [Accounts]
+      summary: Delete account
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Deleted
+
+  /api/v1/transactions:
+    get:
+      tags: [Transactions]
+      summary: List transactions (cursor pagination)
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, maximum: 100 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [expense, income, transfer, people]
+        - in: query
+          name: accountKey
+          schema: { type: string }
+        - in: query
+          name: categoryKey
+          schema: { type: string }
+        - in: query
+          name: eventId
+          schema: { type: string }
+      responses:
+        '200':
+          description: Transactions with meta pagination
+    post:
+      tags: [Transactions]
+      summary: Create transaction
+      responses:
+        '201':
+          description: Created
+
+  /api/v1/transactions/{id}:
+    get:
+      tags: [Transactions]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Transaction
+    patch:
+      tags: [Transactions]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Updated
+    delete:
+      tags: [Transactions]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Deleted
+
+  /api/v1/budgets:
+    get:
+      tags: [Budgets]
+      summary: List budgets and excluded recurring entries
+      responses:
+        '200':
+          description: Budget state
+    post:
+      tags: [Budgets]
+      summary: Create budget
+      responses:
+        '201':
+          description: Created
+
+  /api/v1/goals:
+    get:
+      tags: [Goals]
+      summary: List goals and saving transactions
+      responses:
+        '200':
+          description: Goals state
+    post:
+      tags: [Goals]
+      summary: Create goal
+      responses:
+        '201':
+          description: Created
+
+  /api/v1/goals/{goalId}/contributions:
+    post:
+      tags: [Goals]
+      summary: Add saving contribution
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema: { type: string }
+      responses:
+        '201':
+          description: Created contribution
+
+  /api/v1/events:
+    get:
+      tags: [Events]
+      responses:
+        '200':
+          description: Events list
+    post:
+      tags: [Events]
+      responses:
+        '201':
+          description: Created
+
+  /api/v1/reminders:
+    get:
+      tags: [Reminders]
+      responses:
+        '200':
+          description: Reminders list
+    post:
+      tags: [Reminders]
+      responses:
+        '201':
+          description: Created
+
+  /api/v1/categories:
+    get:
+      tags: [Categories]
+      summary: Disabled keys and custom categories
+      responses:
+        '200':
+          description: Category state
+
+  /api/v1/uploads/receipts:
+    post:
+      tags: [Uploads]
+      summary: Upload receipt image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Returns receiptUri URL
+        '400':
+          description: Invalid or missing file
+
+  /api/v1/uploads/avatars:
+    post:
+      tags: [Uploads]
+      summary: Upload profile avatar
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Returns avatarUrl
