@@ -69,23 +69,55 @@ async function ensureUserInternal(clerkUserId: string): Promise<UserRecord> {
   return user;
 }
 
+const USER_CACHE_TTL_MS = 60_000;
 const ensureUserInflight = new Map<string, Promise<UserRecord>>();
+const userCache = new Map<string, { user: UserRecord; expiresAt: number }>();
+
+function getCachedUser(clerkUserId: string): UserRecord | null {
+  const entry = userCache.get(clerkUserId);
+  if (!entry) {
+    return null;
+  }
+  if (Date.now() > entry.expiresAt) {
+    userCache.delete(clerkUserId);
+    return null;
+  }
+  return entry.user;
+}
+
+function setCachedUser(clerkUserId: string, user: UserRecord): void {
+  userCache.set(clerkUserId, { user, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+}
+
+export function invalidateUserCache(clerkUserId: string): void {
+  userCache.delete(clerkUserId);
+}
 
 export async function ensureUser(clerkUserId: string): Promise<UserRecord> {
+  const cached = getCachedUser(clerkUserId);
+  if (cached) {
+    return cached;
+  }
+
   const inflight = ensureUserInflight.get(clerkUserId);
   if (inflight) {
     return inflight;
   }
 
-  const promise = ensureUserInternal(clerkUserId).finally(() => {
-    ensureUserInflight.delete(clerkUserId);
-  });
+  const promise = ensureUserInternal(clerkUserId)
+    .then((user) => {
+      setCachedUser(clerkUserId, user);
+      return user;
+    })
+    .finally(() => {
+      ensureUserInflight.delete(clerkUserId);
+    });
   ensureUserInflight.set(clerkUserId, promise);
   return promise;
 }
 
 export async function getMe(clerkUserId: string): Promise<MeResponse> {
-  const user = await ensureValidAvatar(await ensureUser(clerkUserId), clerkUserId);
+  const user = await ensureUser(clerkUserId);
   return toMeResponse(user);
 }
 
@@ -114,6 +146,8 @@ export async function updateProfile(
     hasCompletedOnboarding: input.hasCompletedOnboarding,
   });
 
+  invalidateUserCache(clerkUserId);
+  setCachedUser(clerkUserId, user);
   return toMeResponse(user);
 }
 
@@ -133,30 +167,14 @@ function toMeResponse(user: UserRecord): MeResponse {
   };
 }
 
-async function ensureValidAvatar(user: UserRecord, clerkUserId: string): Promise<UserRecord> {
-  const avatarUrl = user.avatarUrl?.trim();
-  if (!avatarUrl) {
-    return user;
-  }
-
-  try {
-    const response = await fetch(avatarUrl, { method: 'HEAD' });
-    if (response.ok) {
-      return user;
-    }
-  } catch {
-    return user;
-  }
-
-  return userRepository.updateUser(clerkUserId, { avatarUrl: null });
-}
-
 /** Wipes all expense data for the signed-in user while keeping their account. */
 export async function wipeUserData(clerkUserId: string): Promise<void> {
   const user = await ensureUser(clerkUserId);
   await userDataRepository.deleteAllUserData(user.id);
   await deleteUserUploads(clerkUserId);
-  await userRepository.updateUser(clerkUserId, { avatarUrl: null });
+  const updated = await userRepository.updateUser(clerkUserId, { avatarUrl: null });
+  invalidateUserCache(clerkUserId);
+  setCachedUser(clerkUserId, updated);
   await seedDefaultAccounts(user.id);
   await preferencesRepository.getOrCreatePreferences(user.id);
 }
@@ -168,4 +186,5 @@ export async function deleteUserByClerkId(clerkUserId: string): Promise<void> {
     return;
   }
   await userRepository.deleteUserByClerkId(clerkUserId);
+  invalidateUserCache(clerkUserId);
 }

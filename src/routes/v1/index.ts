@@ -11,6 +11,7 @@ import { eventRouter } from './eventRoutes';
 import { goalRouter } from './goalRoutes';
 import { meRouter } from './meRoutes';
 import { reminderRouter } from './reminderRoutes';
+import { syncRouter } from './syncRoutes';
 import { transactionRouter } from './transactionRoutes';
 import { uploadRouter } from './uploadRoutes';
 
@@ -25,6 +26,7 @@ v1Router.use(createWriteRateLimiter());
 // More specific /me/* mounts before /me
 v1Router.use('/me/preferences', preferencesRouter);
 v1Router.use('/me', meRouter);
+v1Router.use('/sync', syncRouter);
 v1Router.use('/accounts', accountRouter);
 v1Router.use('/transactions', transactionRouter);
 v1Router.use('/budgets', budgetRouter);

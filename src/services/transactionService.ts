@@ -125,6 +125,20 @@ export async function listTransactions(
   };
 }
 
+const SYNC_TRANSACTION_LIMIT = 10_000;
+
+/** Returns all transactions in one query for bootstrap sync. */
+export async function listAllTransactionsForSync(
+  clerkUserId: string,
+): Promise<TransactionResponse[]> {
+  const user = await ensureUser(clerkUserId);
+  const rows = await transactionRepository.listAllTransactionsForUser(
+    user.id,
+    SYNC_TRANSACTION_LIMIT,
+  );
+  return rows.map(toTransactionResponse);
+}
+
 export async function getTransaction(
   clerkUserId: string,
   transactionId: string,

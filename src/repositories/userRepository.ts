@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import type { UserRecord } from '../types/domain/user';
 import { isUniqueViolation } from '../utils/dbErrors';
+import { withDbRetry } from '../utils/dbRetry';
 
 interface UserRow {
   id: string;
@@ -97,30 +98,32 @@ export async function updateUser(
   clerkUserId: string,
   input: UpdateUserInput,
 ): Promise<UserRecord> {
-  const patch: Record<string, unknown> = {};
+  return withDbRetry(async () => {
+    const patch: Record<string, unknown> = {};
 
-  if (input.email !== undefined) patch.email = input.email;
-  if (input.name !== undefined) patch.name = input.name;
-  if (input.dateOfBirth !== undefined) patch.date_of_birth = input.dateOfBirth;
-  if (input.userType !== undefined) patch.user_type = input.userType;
-  if (input.gender !== undefined) patch.gender = input.gender;
-  if (input.avatarUrl !== undefined) patch.avatar_url = input.avatarUrl;
-  if (input.hasCompletedOnboarding !== undefined) {
-    patch.has_completed_onboarding = input.hasCompletedOnboarding;
-  }
+    if (input.email !== undefined) patch.email = input.email;
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.dateOfBirth !== undefined) patch.date_of_birth = input.dateOfBirth;
+    if (input.userType !== undefined) patch.user_type = input.userType;
+    if (input.gender !== undefined) patch.gender = input.gender;
+    if (input.avatarUrl !== undefined) patch.avatar_url = input.avatarUrl;
+    if (input.hasCompletedOnboarding !== undefined) {
+      patch.has_completed_onboarding = input.hasCompletedOnboarding;
+    }
 
-  const { data, error } = await getSupabaseAdmin()
-    .from('users')
-    .update(patch)
-    .eq('clerk_user_id', clerkUserId)
-    .select('*')
-    .single();
+    const { data, error } = await getSupabaseAdmin()
+      .from('users')
+      .update(patch)
+      .eq('clerk_user_id', clerkUserId)
+      .select('*')
+      .single();
 
-  if (error) {
-    wrapDbError(error);
-  }
+    if (error) {
+      wrapDbError(error);
+    }
 
-  return mapUserRow(data as UserRow);
+    return mapUserRow(data as UserRow);
+  });
 }
 
 export async function deleteUserByClerkId(clerkUserId: string): Promise<void> {

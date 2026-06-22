@@ -157,6 +157,26 @@ export async function listTransactions(
   return (data as TransactionRow[]).map(mapTransactionRow);
 }
 
+/** Full list for bootstrap sync — capped to avoid unbounded payloads. */
+export async function listAllTransactionsForUser(
+  userId: string,
+  limit: number,
+): Promise<TransactionRecord[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('date', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    wrapDbError(error);
+  }
+
+  return (data as TransactionRow[]).map(mapTransactionRow);
+}
+
 export async function findTransactionById(
   userId: string,
   transactionId: string,
