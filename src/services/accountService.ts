@@ -1,5 +1,5 @@
 import * as accountRepository from '../repositories/accountRepository';
-import { ConflictError, NotFoundError } from '../errors';
+import { NotFoundError } from '../errors';
 import type {
   AccountRecord,
   AccountResponse,
@@ -52,8 +52,10 @@ export async function listAccounts(clerkUserId: string): Promise<AccountsListRes
     deletedAccountNames[entry.accountId] = entry.name;
   }
 
+  const deletedIds = new Set(Object.keys(deletedAccountNames));
+
   return {
-    accounts: accounts.map(toAccountResponse),
+    accounts: accounts.filter((account) => !deletedIds.has(account.id)).map(toAccountResponse),
     deletedAccountNames,
   };
 }
@@ -136,15 +138,17 @@ export async function updateAccount(
 export async function deleteAccount(clerkUserId: string, accountId: string): Promise<void> {
   const user = await ensureUser(clerkUserId);
 
-  if (PROTECTED_ACCOUNT_IDS.has(accountId)) {
-    throw new ConflictError('Default accounts cannot be deleted', 'ACCOUNT_PROTECTED');
-  }
-
   const existing = await accountRepository.findAccountById(user.id, accountId);
   if (!existing) {
     throw new NotFoundError('Account', accountId);
   }
 
   await accountRepository.upsertDeletedAccountName(user.id, accountId, existing.name);
+
+  // Default accounts stay in DB for transaction references; hide via deleted_account_names.
+  if (PROTECTED_ACCOUNT_IDS.has(accountId)) {
+    return;
+  }
+
   await accountRepository.deleteAccount(user.id, accountId);
 }
