@@ -332,13 +332,18 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(userId: string, transactionId: string): Promise<void> {
-  const { error } = await getSupabaseAdmin()
+  const { data, error } = await getSupabaseAdmin()
     .from('transactions')
     .delete()
     .eq('user_id', userId)
-    .eq('id', transactionId);
+    .eq('id', transactionId)
+    .select('id');
 
   if (error) {
     wrapDbError(error);
+  }
+
+  if (!data?.length) {
+    throw new InternalServerError(`Transaction delete matched no rows: ${transactionId}`);
   }
 }
