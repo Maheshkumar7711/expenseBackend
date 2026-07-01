@@ -14,7 +14,9 @@ function isTransientDbError(error: unknown): boolean {
     normalized.includes('enotfound') ||
     normalized.includes('socket hang up') ||
     normalized.includes('network') ||
-    normalized.includes('timeout')
+    normalized.includes('timeout') ||
+    normalized.includes('aborted') ||
+    (error instanceof Error && error.name === 'AbortError')
   );
 }
 
@@ -40,4 +42,9 @@ export async function withDbRetry<T>(
   }
 
   throw lastError;
+}
+
+/** Wrap a repository Supabase operation with transient-error retries. */
+export function runSupabaseQuery<T>(operation: () => Promise<T>): Promise<T> {
+  return withDbRetry(operation);
 }

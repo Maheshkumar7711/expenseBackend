@@ -2,7 +2,7 @@ import { listAccounts } from './accountService';
 import { listBudgets } from './budgetService';
 import { listEvents } from './eventService';
 import { listGoals } from './goalService';
-import { getCategoriesState, getPreferences } from './preferencesService';
+import { getPreferencesBootstrap } from './preferencesService';
 import { listReminders } from './reminderService';
 import { listAllTransactionsForSync } from './transactionService';
 import { getMe } from './userService';
@@ -32,9 +32,8 @@ export async function getBootstrapSync(clerkUserId: string): Promise<BootstrapSy
   // Resolve user once so follow-up queries do not compete with parallel ensureUser work.
   const me = await getMe(clerkUserId);
 
-  const [preferences, categories, accounts, transactions] = await Promise.all([
-    getPreferences(clerkUserId),
-    getCategoriesState(clerkUserId),
+  const [{ preferences, categories }, accounts, transactions] = await Promise.all([
+    getPreferencesBootstrap(clerkUserId),
     listAccounts(clerkUserId),
     listAllTransactionsForSync(clerkUserId),
   ]);

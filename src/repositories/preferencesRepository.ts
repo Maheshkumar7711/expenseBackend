@@ -7,6 +7,7 @@ import type {
   UserPreferencesRecord,
 } from '../types/domain/preferences';
 import { isUniqueViolation } from '../utils/dbErrors';
+import { withDbRetry } from '../utils/dbRetry';
 
 interface PreferencesRow {
   user_id: string;
@@ -82,6 +83,12 @@ function wrapDbError(error: { message: string }): never {
 export async function getOrCreatePreferences(
   userId: string,
 ): Promise<UserPreferencesRecord> {
+  return withDbRetry(async () => getOrCreatePreferencesInternal(userId));
+}
+
+async function getOrCreatePreferencesInternal(
+  userId: string,
+): Promise<UserPreferencesRecord> {
   const { data, error } = await getSupabaseAdmin()
     .from('user_preferences')
     .select('*')
@@ -128,7 +135,14 @@ export async function updatePreferences(
   userId: string,
   input: UpdatePreferencesInput,
 ): Promise<UserPreferencesRecord> {
-  await getOrCreatePreferences(userId);
+  return withDbRetry(async () => updatePreferencesInternal(userId, input));
+}
+
+async function updatePreferencesInternal(
+  userId: string,
+  input: UpdatePreferencesInput,
+): Promise<UserPreferencesRecord> {
+  await getOrCreatePreferencesInternal(userId);
 
   const patch: Record<string, unknown> = {};
   if (input.currencyCode !== undefined) patch.currency_code = input.currencyCode;
@@ -157,6 +171,10 @@ export async function updatePreferences(
 }
 
 export async function listCustomCategories(userId: string): Promise<CustomCategoryRecord[]> {
+  return withDbRetry(async () => listCustomCategoriesInternal(userId));
+}
+
+async function listCustomCategoriesInternal(userId: string): Promise<CustomCategoryRecord[]> {
   const { data, error } = await getSupabaseAdmin()
     .from('custom_categories')
     .select('*')
@@ -168,6 +186,13 @@ export async function listCustomCategories(userId: string): Promise<CustomCatego
 }
 
 export async function findCustomCategoryById(
+  userId: string,
+  categoryId: string,
+): Promise<CustomCategoryRecord | null> {
+  return withDbRetry(async () => findCustomCategoryByIdInternal(userId, categoryId));
+}
+
+async function findCustomCategoryByIdInternal(
   userId: string,
   categoryId: string,
 ): Promise<CustomCategoryRecord | null> {
@@ -190,6 +215,12 @@ export interface CreateCustomCategoryInput {
 }
 
 export async function createCustomCategory(
+  input: CreateCustomCategoryInput,
+): Promise<CustomCategoryRecord> {
+  return withDbRetry(async () => createCustomCategoryInternal(input));
+}
+
+async function createCustomCategoryInternal(
   input: CreateCustomCategoryInput,
 ): Promise<CustomCategoryRecord> {
   const { data, error } = await getSupabaseAdmin()
@@ -217,6 +248,14 @@ export async function updateCustomCategory(
   categoryId: string,
   input: UpdateCustomCategoryInput,
 ): Promise<CustomCategoryRecord> {
+  return withDbRetry(async () => updateCustomCategoryInternal(userId, categoryId, input));
+}
+
+async function updateCustomCategoryInternal(
+  userId: string,
+  categoryId: string,
+  input: UpdateCustomCategoryInput,
+): Promise<CustomCategoryRecord> {
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) patch.name = input.name;
   if (input.linkedToKey !== undefined) patch.linked_to_key = input.linkedToKey;
@@ -237,6 +276,10 @@ export async function deleteCustomCategory(
   userId: string,
   categoryId: string,
 ): Promise<void> {
+  return withDbRetry(async () => deleteCustomCategoryInternal(userId, categoryId));
+}
+
+async function deleteCustomCategoryInternal(userId: string, categoryId: string): Promise<void> {
   const { error } = await getSupabaseAdmin()
     .from('custom_categories')
     .delete()

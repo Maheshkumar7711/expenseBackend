@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
+import { runSupabaseQuery } from '../utils/dbRetry';
 import type { GoalRecord, SavingTransactionRecord } from '../types/domain/goal';
 
 interface GoalRow {
@@ -65,42 +66,48 @@ function wrapDbError(error: { message: string }): never {
 }
 
 export async function listGoals(userId: string): Promise<GoalRecord[]> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('goals')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true });
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('goals')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
 
-  if (error) wrapDbError(error);
-  return (data as GoalRow[]).map(mapGoalRow);
+    if (error) wrapDbError(error);
+    return (data as GoalRow[]).map(mapGoalRow);
+  });
 }
 
 export async function findGoalById(
   userId: string,
   goalId: string,
 ): Promise<GoalRecord | null> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('goals')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('id', goalId)
-    .maybeSingle();
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('goals')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', goalId)
+      .maybeSingle();
 
-  if (error) wrapDbError(error);
-  return data ? mapGoalRow(data as GoalRow) : null;
+    if (error) wrapDbError(error);
+    return data ? mapGoalRow(data as GoalRow) : null;
+  });
 }
 
 export async function listSavingTransactions(
   userId: string,
 ): Promise<SavingTransactionRecord[]> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('saving_transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('date', { ascending: false });
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('saving_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
 
-  if (error) wrapDbError(error);
-  return (data as SavingTransactionRow[]).map(mapSavingRow);
+    if (error) wrapDbError(error);
+    return (data as SavingTransactionRow[]).map(mapSavingRow);
+  });
 }
 
 export interface CreateGoalInput {
@@ -116,24 +123,26 @@ export interface CreateGoalInput {
 }
 
 export async function createGoal(input: CreateGoalInput): Promise<GoalRecord> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('goals')
-    .insert({
-      id: input.id,
-      user_id: input.userId,
-      name: input.name,
-      target_date: input.targetDate,
-      target_amount: input.targetAmount,
-      saved_amount: input.savedAmount ?? 0,
-      icon_key: input.iconKey,
-      tags: input.tags ?? [],
-      achieved: input.achieved ?? false,
-    })
-    .select('*')
-    .single();
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('goals')
+      .insert({
+        id: input.id,
+        user_id: input.userId,
+        name: input.name,
+        target_date: input.targetDate,
+        target_amount: input.targetAmount,
+        saved_amount: input.savedAmount ?? 0,
+        icon_key: input.iconKey,
+        tags: input.tags ?? [],
+        achieved: input.achieved ?? false,
+      })
+      .select('*')
+      .single();
 
-  if (error) wrapDbError(error);
-  return mapGoalRow(data as GoalRow);
+    if (error) wrapDbError(error);
+    return mapGoalRow(data as GoalRow);
+  });
 }
 
 export interface UpdateGoalInput {
@@ -151,35 +160,39 @@ export async function updateGoal(
   goalId: string,
   input: UpdateGoalInput,
 ): Promise<GoalRecord> {
-  const patch: Record<string, unknown> = {};
-  if (input.name !== undefined) patch.name = input.name;
-  if (input.targetDate !== undefined) patch.target_date = input.targetDate;
-  if (input.targetAmount !== undefined) patch.target_amount = input.targetAmount;
-  if (input.savedAmount !== undefined) patch.saved_amount = input.savedAmount;
-  if (input.iconKey !== undefined) patch.icon_key = input.iconKey;
-  if (input.tags !== undefined) patch.tags = input.tags;
-  if (input.achieved !== undefined) patch.achieved = input.achieved;
+  return runSupabaseQuery(async () => {
+    const patch: Record<string, unknown> = {};
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.targetDate !== undefined) patch.target_date = input.targetDate;
+    if (input.targetAmount !== undefined) patch.target_amount = input.targetAmount;
+    if (input.savedAmount !== undefined) patch.saved_amount = input.savedAmount;
+    if (input.iconKey !== undefined) patch.icon_key = input.iconKey;
+    if (input.tags !== undefined) patch.tags = input.tags;
+    if (input.achieved !== undefined) patch.achieved = input.achieved;
 
-  const { data, error } = await getSupabaseAdmin()
-    .from('goals')
-    .update(patch)
-    .eq('user_id', userId)
-    .eq('id', goalId)
-    .select('*')
-    .single();
+    const { data, error } = await getSupabaseAdmin()
+      .from('goals')
+      .update(patch)
+      .eq('user_id', userId)
+      .eq('id', goalId)
+      .select('*')
+      .single();
 
-  if (error) wrapDbError(error);
-  return mapGoalRow(data as GoalRow);
+    if (error) wrapDbError(error);
+    return mapGoalRow(data as GoalRow);
+  });
 }
 
 export async function deleteGoal(userId: string, goalId: string): Promise<void> {
-  const { error } = await getSupabaseAdmin()
-    .from('goals')
-    .delete()
-    .eq('user_id', userId)
-    .eq('id', goalId);
+  return runSupabaseQuery(async () => {
+    const { error } = await getSupabaseAdmin()
+      .from('goals')
+      .delete()
+      .eq('user_id', userId)
+      .eq('id', goalId);
 
-  if (error) wrapDbError(error);
+    if (error) wrapDbError(error);
+  });
 }
 
 export interface CreateSavingTransactionInput {
@@ -194,43 +207,47 @@ export interface CreateSavingTransactionInput {
 export async function createSavingTransaction(
   input: CreateSavingTransactionInput,
 ): Promise<SavingTransactionRecord> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('saving_transactions')
-    .insert({
-      id: input.id,
-      user_id: input.userId,
-      goal_id: input.goalId,
-      amount: input.amount,
-      date: input.date,
-      source_account_key: input.sourceAccountKey,
-    })
-    .select('*')
-    .single();
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('saving_transactions')
+      .insert({
+        id: input.id,
+        user_id: input.userId,
+        goal_id: input.goalId,
+        amount: input.amount,
+        date: input.date,
+        source_account_key: input.sourceAccountKey,
+      })
+      .select('*')
+      .single();
 
-  if (error) wrapDbError(error);
-  return mapSavingRow(data as SavingTransactionRow);
+    if (error) wrapDbError(error);
+    return mapSavingRow(data as SavingTransactionRow);
+  });
 }
 
 export async function deleteSavingTransaction(
   userId: string,
   contributionId: string,
 ): Promise<SavingTransactionRecord | null> {
-  const { data: existing, error: findError } = await getSupabaseAdmin()
-    .from('saving_transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('id', contributionId)
-    .maybeSingle();
+  return runSupabaseQuery(async () => {
+    const { data: existing, error: findError } = await getSupabaseAdmin()
+      .from('saving_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', contributionId)
+      .maybeSingle();
 
-  if (findError) wrapDbError(findError);
-  if (!existing) return null;
+    if (findError) wrapDbError(findError);
+    if (!existing) return null;
 
-  const { error } = await getSupabaseAdmin()
-    .from('saving_transactions')
-    .delete()
-    .eq('user_id', userId)
-    .eq('id', contributionId);
+    const { error } = await getSupabaseAdmin()
+      .from('saving_transactions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('id', contributionId);
 
-  if (error) wrapDbError(error);
-  return mapSavingRow(existing as SavingTransactionRow);
+    if (error) wrapDbError(error);
+    return mapSavingRow(existing as SavingTransactionRow);
+  });
 }
