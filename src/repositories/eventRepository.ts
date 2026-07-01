@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
+import { runSupabaseQuery } from '../utils/dbRetry';
 import type { EventRecord } from '../types/domain/event';
 
 interface EventRow {
@@ -31,29 +32,33 @@ function wrapDbError(error: { message: string }): never {
 }
 
 export async function listEvents(userId: string): Promise<EventRecord[]> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('events')
-    .select('*')
-    .eq('user_id', userId)
-    .order('start_date', { ascending: false });
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('events')
+      .select('*')
+      .eq('user_id', userId)
+      .order('start_date', { ascending: false });
 
-  if (error) wrapDbError(error);
-  return (data as EventRow[]).map(mapEventRow);
+    if (error) wrapDbError(error);
+    return (data as EventRow[]).map(mapEventRow);
+  });
 }
 
 export async function findEventById(
   userId: string,
   eventId: string,
 ): Promise<EventRecord | null> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('events')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('id', eventId)
-    .maybeSingle();
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('events')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', eventId)
+      .maybeSingle();
 
-  if (error) wrapDbError(error);
-  return data ? mapEventRow(data as EventRow) : null;
+    if (error) wrapDbError(error);
+    return data ? mapEventRow(data as EventRow) : null;
+  });
 }
 
 export interface CreateEventInput {
@@ -66,21 +71,23 @@ export interface CreateEventInput {
 }
 
 export async function createEvent(input: CreateEventInput): Promise<EventRecord> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('events')
-    .insert({
-      id: input.id,
-      user_id: input.userId,
-      name: input.name,
-      description: input.description,
-      start_date: input.startDate,
-      end_date: input.endDate,
-    })
-    .select('*')
-    .single();
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('events')
+      .insert({
+        id: input.id,
+        user_id: input.userId,
+        name: input.name,
+        description: input.description,
+        start_date: input.startDate,
+        end_date: input.endDate,
+      })
+      .select('*')
+      .single();
 
-  if (error) wrapDbError(error);
-  return mapEventRow(data as EventRow);
+    if (error) wrapDbError(error);
+    return mapEventRow(data as EventRow);
+  });
 }
 
 export interface UpdateEventInput {
@@ -95,30 +102,34 @@ export async function updateEvent(
   eventId: string,
   input: UpdateEventInput,
 ): Promise<EventRecord> {
-  const patch: Record<string, unknown> = {};
-  if (input.name !== undefined) patch.name = input.name;
-  if (input.description !== undefined) patch.description = input.description;
-  if (input.startDate !== undefined) patch.start_date = input.startDate;
-  if (input.endDate !== undefined) patch.end_date = input.endDate;
+  return runSupabaseQuery(async () => {
+    const patch: Record<string, unknown> = {};
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.description !== undefined) patch.description = input.description;
+    if (input.startDate !== undefined) patch.start_date = input.startDate;
+    if (input.endDate !== undefined) patch.end_date = input.endDate;
 
-  const { data, error } = await getSupabaseAdmin()
-    .from('events')
-    .update(patch)
-    .eq('user_id', userId)
-    .eq('id', eventId)
-    .select('*')
-    .single();
+    const { data, error } = await getSupabaseAdmin()
+      .from('events')
+      .update(patch)
+      .eq('user_id', userId)
+      .eq('id', eventId)
+      .select('*')
+      .single();
 
-  if (error) wrapDbError(error);
-  return mapEventRow(data as EventRow);
+    if (error) wrapDbError(error);
+    return mapEventRow(data as EventRow);
+  });
 }
 
 export async function deleteEvent(userId: string, eventId: string): Promise<void> {
-  const { error } = await getSupabaseAdmin()
-    .from('events')
-    .delete()
-    .eq('user_id', userId)
-    .eq('id', eventId);
+  return runSupabaseQuery(async () => {
+    const { error } = await getSupabaseAdmin()
+      .from('events')
+      .delete()
+      .eq('user_id', userId)
+      .eq('id', eventId);
 
-  if (error) wrapDbError(error);
+    if (error) wrapDbError(error);
+  });
 }

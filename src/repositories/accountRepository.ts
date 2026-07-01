@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { isUniqueViolation } from '../utils/dbErrors';
+import { runSupabaseQuery } from '../utils/dbRetry';
 import type {
   AccountRecord,
   AccountType,
@@ -52,20 +53,22 @@ function wrapDbError(error: { message: string }): never {
 }
 
 export async function listAccountsByUser(userId: string): Promise<AccountRecord[]> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('accounts')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true });
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('accounts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
 
-  if (error) {
-    wrapDbError(error);
-  }
+    if (error) {
+      wrapDbError(error);
+    }
 
-  return (data as AccountRow[]).map(mapAccountRow);
+    return (data as AccountRow[]).map(mapAccountRow);
+  });
 }
 
-export async function findAccountById(
+async function findAccountByIdInternal(
   userId: string,
   accountId: string,
 ): Promise<AccountRecord | null> {
@@ -83,23 +86,32 @@ export async function findAccountById(
   return data ? mapAccountRow(data as AccountRow) : null;
 }
 
+export async function findAccountById(
+  userId: string,
+  accountId: string,
+): Promise<AccountRecord | null> {
+  return runSupabaseQuery(async () => findAccountByIdInternal(userId, accountId));
+}
+
 export async function listDeletedAccountNames(
   userId: string,
 ): Promise<DeletedAccountNameRecord[]> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('deleted_account_names')
-    .select('*')
-    .eq('user_id', userId);
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('deleted_account_names')
+      .select('*')
+      .eq('user_id', userId);
 
-  if (error) {
-    wrapDbError(error);
-  }
+    if (error) {
+      wrapDbError(error);
+    }
 
-  return (data as DeletedAccountNameRow[]).map((row) => ({
-    userId: row.user_id,
-    accountId: row.account_id,
-    name: row.name,
-  }));
+    return (data as DeletedAccountNameRow[]).map((row) => ({
+      userId: row.user_id,
+      accountId: row.account_id,
+      name: row.name,
+    }));
+  });
 }
 
 export interface CreateAccountInput {
@@ -115,33 +127,35 @@ export interface CreateAccountInput {
 }
 
 export async function createAccount(input: CreateAccountInput): Promise<AccountRecord> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('accounts')
-    .insert({
-      id: input.id,
-      user_id: input.userId,
-      type: input.type,
-      name: input.name,
-      opening_balance: input.openingBalance,
-      deactivated: input.deactivated ?? false,
-      bank_name: input.bankName ?? null,
-      bank_key: input.bankKey ?? null,
-      icon_key: input.iconKey ?? null,
-    })
-    .select('*')
-    .single();
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('accounts')
+      .insert({
+        id: input.id,
+        user_id: input.userId,
+        type: input.type,
+        name: input.name,
+        opening_balance: input.openingBalance,
+        deactivated: input.deactivated ?? false,
+        bank_name: input.bankName ?? null,
+        bank_key: input.bankKey ?? null,
+        icon_key: input.iconKey ?? null,
+      })
+      .select('*')
+      .single();
 
-  if (error) {
-    if (isUniqueViolation(error)) {
-      const existing = await findAccountById(input.userId, input.id);
-      if (existing) {
-        return existing;
+    if (error) {
+      if (isUniqueViolation(error)) {
+        const existing = await findAccountByIdInternal(input.userId, input.id);
+        if (existing) {
+          return existing;
+        }
       }
+      wrapDbError(error);
     }
-    wrapDbError(error);
-  }
 
-  return mapAccountRow(data as AccountRow);
+    return mapAccountRow(data as AccountRow);
+  });
 }
 
 export interface UpdateAccountInput {
@@ -159,41 +173,45 @@ export async function updateAccount(
   accountId: string,
   input: UpdateAccountInput,
 ): Promise<AccountRecord> {
-  const patch: Record<string, unknown> = {};
+  return runSupabaseQuery(async () => {
+    const patch: Record<string, unknown> = {};
 
-  if (input.type !== undefined) patch.type = input.type;
-  if (input.name !== undefined) patch.name = input.name;
-  if (input.openingBalance !== undefined) patch.opening_balance = input.openingBalance;
-  if (input.deactivated !== undefined) patch.deactivated = input.deactivated;
-  if (input.bankName !== undefined) patch.bank_name = input.bankName;
-  if (input.bankKey !== undefined) patch.bank_key = input.bankKey;
-  if (input.iconKey !== undefined) patch.icon_key = input.iconKey;
+    if (input.type !== undefined) patch.type = input.type;
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.openingBalance !== undefined) patch.opening_balance = input.openingBalance;
+    if (input.deactivated !== undefined) patch.deactivated = input.deactivated;
+    if (input.bankName !== undefined) patch.bank_name = input.bankName;
+    if (input.bankKey !== undefined) patch.bank_key = input.bankKey;
+    if (input.iconKey !== undefined) patch.icon_key = input.iconKey;
 
-  const { data, error } = await getSupabaseAdmin()
-    .from('accounts')
-    .update(patch)
-    .eq('user_id', userId)
-    .eq('id', accountId)
-    .select('*')
-    .single();
+    const { data, error } = await getSupabaseAdmin()
+      .from('accounts')
+      .update(patch)
+      .eq('user_id', userId)
+      .eq('id', accountId)
+      .select('*')
+      .single();
 
-  if (error) {
-    wrapDbError(error);
-  }
+    if (error) {
+      wrapDbError(error);
+    }
 
-  return mapAccountRow(data as AccountRow);
+    return mapAccountRow(data as AccountRow);
+  });
 }
 
 export async function deleteAccount(userId: string, accountId: string): Promise<void> {
-  const { error } = await getSupabaseAdmin()
-    .from('accounts')
-    .delete()
-    .eq('user_id', userId)
-    .eq('id', accountId);
+  return runSupabaseQuery(async () => {
+    const { error } = await getSupabaseAdmin()
+      .from('accounts')
+      .delete()
+      .eq('user_id', userId)
+      .eq('id', accountId);
 
-  if (error) {
-    wrapDbError(error);
-  }
+    if (error) {
+      wrapDbError(error);
+    }
+  });
 }
 
 export async function upsertDeletedAccountName(
@@ -201,18 +219,20 @@ export async function upsertDeletedAccountName(
   accountId: string,
   name: string,
 ): Promise<void> {
-  const { error } = await getSupabaseAdmin()
-    .from('deleted_account_names')
-    .upsert(
-      {
-        user_id: userId,
-        account_id: accountId,
-        name,
-      },
-      { onConflict: 'user_id,account_id' },
-    );
+  return runSupabaseQuery(async () => {
+    const { error } = await getSupabaseAdmin()
+      .from('deleted_account_names')
+      .upsert(
+        {
+          user_id: userId,
+          account_id: accountId,
+          name,
+        },
+        { onConflict: 'user_id,account_id' },
+      );
 
-  if (error) {
-    wrapDbError(error);
-  }
+    if (error) {
+      wrapDbError(error);
+    }
+  });
 }

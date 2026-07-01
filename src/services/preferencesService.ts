@@ -39,6 +39,31 @@ export async function getPreferences(clerkUserId: string): Promise<UserPreferenc
   return toPreferencesResponse(record);
 }
 
+export interface PreferencesBootstrapData {
+  preferences: UserPreferencesResponse;
+  categories: CategoriesStateResponse;
+}
+
+/** Single preferences round-trip for bootstrap sync (avoids duplicate getOrCreatePreferences). */
+export async function getPreferencesBootstrap(
+  clerkUserId: string,
+): Promise<PreferencesBootstrapData> {
+  const user = await ensureUser(clerkUserId);
+
+  const [preferencesRecord, customCategories] = await Promise.all([
+    preferencesRepository.getOrCreatePreferences(user.id),
+    preferencesRepository.listCustomCategories(user.id),
+  ]);
+
+  return {
+    preferences: toPreferencesResponse(preferencesRecord),
+    categories: {
+      disabledCategoryKeys: preferencesRecord.disabledCategoryKeys,
+      customCategories: customCategories.map(toCustomCategoryResponse),
+    },
+  };
+}
+
 export interface UpdatePreferencesInput {
   currencyCode?: string;
   countryCode?: string;

@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
+import { runSupabaseQuery } from '../utils/dbRetry';
 import type { ReminderInterval, ReminderRecord } from '../types/domain/reminder';
 
 interface ReminderRow {
@@ -31,29 +32,33 @@ function wrapDbError(error: { message: string }): never {
 }
 
 export async function listReminders(userId: string): Promise<ReminderRecord[]> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('reminders')
-    .select('*')
-    .eq('user_id', userId)
-    .order('reminder_date', { ascending: true });
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('reminders')
+      .select('*')
+      .eq('user_id', userId)
+      .order('reminder_date', { ascending: true });
 
-  if (error) wrapDbError(error);
-  return (data as ReminderRow[]).map(mapReminderRow);
+    if (error) wrapDbError(error);
+    return (data as ReminderRow[]).map(mapReminderRow);
+  });
 }
 
 export async function findReminderById(
   userId: string,
   reminderId: string,
 ): Promise<ReminderRecord | null> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('reminders')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('id', reminderId)
-    .maybeSingle();
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('reminders')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', reminderId)
+      .maybeSingle();
 
-  if (error) wrapDbError(error);
-  return data ? mapReminderRow(data as ReminderRow) : null;
+    if (error) wrapDbError(error);
+    return data ? mapReminderRow(data as ReminderRow) : null;
+  });
 }
 
 export interface CreateReminderInput {
@@ -66,21 +71,23 @@ export interface CreateReminderInput {
 }
 
 export async function createReminder(input: CreateReminderInput): Promise<ReminderRecord> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('reminders')
-    .insert({
-      id: input.id,
-      user_id: input.userId,
-      title: input.title,
-      reminder_date: input.date,
-      reminder_time: input.time,
-      reminder_interval: input.interval,
-    })
-    .select('*')
-    .single();
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('reminders')
+      .insert({
+        id: input.id,
+        user_id: input.userId,
+        title: input.title,
+        reminder_date: input.date,
+        reminder_time: input.time,
+        reminder_interval: input.interval,
+      })
+      .select('*')
+      .single();
 
-  if (error) wrapDbError(error);
-  return mapReminderRow(data as ReminderRow);
+    if (error) wrapDbError(error);
+    return mapReminderRow(data as ReminderRow);
+  });
 }
 
 export interface UpdateReminderInput {
@@ -95,30 +102,34 @@ export async function updateReminder(
   reminderId: string,
   input: UpdateReminderInput,
 ): Promise<ReminderRecord> {
-  const patch: Record<string, unknown> = {};
-  if (input.title !== undefined) patch.title = input.title;
-  if (input.date !== undefined) patch.reminder_date = input.date;
-  if (input.time !== undefined) patch.reminder_time = input.time;
-  if (input.interval !== undefined) patch.reminder_interval = input.interval;
+  return runSupabaseQuery(async () => {
+    const patch: Record<string, unknown> = {};
+    if (input.title !== undefined) patch.title = input.title;
+    if (input.date !== undefined) patch.reminder_date = input.date;
+    if (input.time !== undefined) patch.reminder_time = input.time;
+    if (input.interval !== undefined) patch.reminder_interval = input.interval;
 
-  const { data, error } = await getSupabaseAdmin()
-    .from('reminders')
-    .update(patch)
-    .eq('user_id', userId)
-    .eq('id', reminderId)
-    .select('*')
-    .single();
+    const { data, error } = await getSupabaseAdmin()
+      .from('reminders')
+      .update(patch)
+      .eq('user_id', userId)
+      .eq('id', reminderId)
+      .select('*')
+      .single();
 
-  if (error) wrapDbError(error);
-  return mapReminderRow(data as ReminderRow);
+    if (error) wrapDbError(error);
+    return mapReminderRow(data as ReminderRow);
+  });
 }
 
 export async function deleteReminder(userId: string, reminderId: string): Promise<void> {
-  const { error } = await getSupabaseAdmin()
-    .from('reminders')
-    .delete()
-    .eq('user_id', userId)
-    .eq('id', reminderId);
+  return runSupabaseQuery(async () => {
+    const { error } = await getSupabaseAdmin()
+      .from('reminders')
+      .delete()
+      .eq('user_id', userId)
+      .eq('id', reminderId);
 
-  if (error) wrapDbError(error);
+    if (error) wrapDbError(error);
+  });
 }

@@ -41,17 +41,19 @@ function wrapDbError(error: { message: string }): never {
 }
 
 export async function findUserByClerkId(clerkUserId: string): Promise<UserRecord | null> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('users')
-    .select('*')
-    .eq('clerk_user_id', clerkUserId)
-    .maybeSingle();
+  return withDbRetry(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('users')
+      .select('*')
+      .eq('clerk_user_id', clerkUserId)
+      .maybeSingle();
 
-  if (error) {
-    wrapDbError(error);
-  }
+    if (error) {
+      wrapDbError(error);
+    }
 
-  return data ? mapUserRow(data as UserRow) : null;
+    return data ? mapUserRow(data as UserRow) : null;
+  });
 }
 
 export interface CreateUserInput {
