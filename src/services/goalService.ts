@@ -19,6 +19,7 @@ function toGoalResponse(record: GoalRecord): GoalResponse {
     savedAmount: record.savedAmount,
     iconKey: record.iconKey,
     tags: record.tags,
+    updatedAt: record.updatedAt,
   };
   if (record.achieved) {
     response.achieved = true;
@@ -33,6 +34,7 @@ function toSavingResponse(record: SavingTransactionRecord): SavingTransactionRes
     amount: record.amount,
     date: record.date,
     sourceAccountKey: record.sourceAccountKey,
+    updatedAt: record.updatedAt,
   };
 }
 
@@ -155,8 +157,14 @@ export async function createContribution(
     throw new NotFoundError('Goal', goalId);
   }
 
+  const id = input.id ?? generateId('saving');
+  const existing = await goalRepository.findSavingTransactionById(user.id, id);
+  if (existing) {
+    return toSavingResponse(existing);
+  }
+
   const record = await goalRepository.createSavingTransaction({
-    id: input.id ?? generateId('saving'),
+    id,
     userId: user.id,
     goalId,
     amount: input.amount,

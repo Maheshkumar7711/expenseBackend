@@ -59,6 +59,7 @@ export interface TransactionResponse {
   source?: 'atm';
   travelCurrencyCode?: string | null;
   travelAmountForeign?: number | null;
+  updatedAt: string;
 }
 
 export interface TransactionsListResponse {

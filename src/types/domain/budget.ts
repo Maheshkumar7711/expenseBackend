@@ -21,6 +21,7 @@ export interface BudgetResponse {
   amount: number;
   monthOnly: boolean;
   period?: string;
+  updatedAt: string;
 }
 
 export interface BudgetsListResponse {

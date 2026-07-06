@@ -29,6 +29,7 @@ export interface AccountResponse {
   bankName?: string;
   bankKey?: string;
   iconKey?: string;
+  updatedAt: string;
 }
 
 export interface AccountsListResponse {

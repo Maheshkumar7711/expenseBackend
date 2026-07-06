@@ -106,24 +106,46 @@ async function uploadToBucket(
 
 /** Best-effort removal of uploaded receipts and avatars for a Clerk user. */
 export async function deleteUserUploads(clerkUserId: string): Promise<void> {
-  for (const bucket of [RECEIPTS_BUCKET, AVATARS_BUCKET]) {
-    const { data: files, error: listError } = await getSupabaseAdmin()
-      .storage.from(bucket)
-      .list(clerkUserId, { limit: 1000 });
+  await Promise.all(
+    [RECEIPTS_BUCKET, AVATARS_BUCKET].map(async (bucket) => {
+      try {
+        await deleteBucketUserFolder(bucket, clerkUserId);
+      } catch (error) {
+        console.warn(`[storage] wipe uploads failed for bucket=${bucket}`, error);
+      }
+    }),
+  );
+}
+
+async function deleteBucketUserFolder(bucket: string, clerkUserId: string): Promise<void> {
+  const storage = getSupabaseAdmin().storage.from(bucket);
+  const pageSize = 1000;
+  let offset = 0;
+
+  for (;;) {
+    const { data: files, error: listError } = await storage.list(clerkUserId, {
+      limit: pageSize,
+      offset,
+    });
 
     if (listError) {
       wrapStorageError(listError);
     }
 
     if (!files?.length) {
-      continue;
+      return;
     }
 
     const paths = files.map((file) => `${clerkUserId}/${file.name}`);
-    const { error: removeError } = await getSupabaseAdmin().storage.from(bucket).remove(paths);
+    const { error: removeError } = await storage.remove(paths);
 
     if (removeError) {
       wrapStorageError(removeError);
     }
+
+    if (files.length < pageSize) {
+      return;
+    }
+    offset += pageSize;
   }
 }

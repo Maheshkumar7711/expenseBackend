@@ -236,3 +236,20 @@ export async function upsertDeletedAccountName(
     }
   });
 }
+
+export async function removeDeletedAccountName(
+  userId: string,
+  accountId: string,
+): Promise<void> {
+  return runSupabaseQuery(async () => {
+    const { error } = await getSupabaseAdmin()
+      .from('deleted_account_names')
+      .delete()
+      .eq('user_id', userId)
+      .eq('account_id', accountId);
+
+    if (error) {
+      wrapDbError(error);
+    }
+  });
+}
