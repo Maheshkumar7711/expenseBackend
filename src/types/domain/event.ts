@@ -15,4 +15,5 @@ export interface EventResponse {
   description: string;
   startDate: string;
   endDate: string;
+  updatedAt: string;
 }

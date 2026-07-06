@@ -22,6 +22,7 @@ function toPreferencesResponse(record: UserPreferencesRecord): UserPreferencesRe
     selectedCurrencyCode: record.travelSelectedCurrencyCode,
     travelStartDate: record.travelStartDate,
     travelEndDate: record.travelEndDate,
+    updatedAt: record.updatedAt,
   };
 }
 
@@ -30,6 +31,7 @@ function toCustomCategoryResponse(record: CustomCategoryRecord): CustomCategoryR
     id: record.id,
     name: record.name,
     linkedToKey: record.linkedToKey,
+    updatedAt: record.updatedAt,
   };
 }
 

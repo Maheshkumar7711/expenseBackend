@@ -136,14 +136,19 @@ export async function updateProfile(
   input: UpdateProfileInput,
 ): Promise<MeResponse> {
   await ensureUser(clerkUserId);
+  const existing = await userRepository.findUserByClerkId(clerkUserId);
+  const patch: UpdateProfileInput = { ...input };
+  if (patch.hasCompletedOnboarding === false && existing?.hasCompletedOnboarding) {
+    delete patch.hasCompletedOnboarding;
+  }
   const user = await userRepository.updateUser(clerkUserId, {
-    name: input.name,
-    email: input.email,
-    dateOfBirth: input.dateOfBirth,
-    userType: input.userType,
-    gender: input.gender,
-    avatarUrl: input.avatarUrl,
-    hasCompletedOnboarding: input.hasCompletedOnboarding,
+    name: patch.name,
+    email: patch.email,
+    dateOfBirth: patch.dateOfBirth,
+    userType: patch.userType,
+    gender: patch.gender,
+    avatarUrl: patch.avatarUrl,
+    hasCompletedOnboarding: patch.hasCompletedOnboarding,
   });
 
   invalidateUserCache(clerkUserId);
@@ -170,13 +175,18 @@ function toMeResponse(user: UserRecord): MeResponse {
 /** Wipes all expense data for the signed-in user while keeping their account. */
 export async function wipeUserData(clerkUserId: string): Promise<void> {
   const user = await ensureUser(clerkUserId);
+
   await userDataRepository.deleteAllUserData(user.id);
   await deleteUserUploads(clerkUserId);
-  const updated = await userRepository.updateUser(clerkUserId, { avatarUrl: null });
+
+  const [updated] = await Promise.all([
+    userRepository.updateUser(clerkUserId, { avatarUrl: null }),
+    seedDefaultAccounts(user.id),
+    preferencesRepository.getOrCreatePreferences(user.id),
+  ]);
+
   invalidateUserCache(clerkUserId);
   setCachedUser(clerkUserId, updated);
-  await seedDefaultAccounts(user.id);
-  await preferencesRepository.getOrCreatePreferences(user.id);
 }
 
 /** Idempotent cleanup when Clerk deletes a user (webhook). Cascades child rows via FK. */

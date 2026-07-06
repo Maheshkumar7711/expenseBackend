@@ -25,6 +25,7 @@ function toTransactionResponse(record: TransactionRecord): TransactionResponse {
     selectedPeoplePayTo: record.selectedPeoplePayTo,
     date: record.date,
     tags: record.tags,
+    updatedAt: record.updatedAt,
   };
 
   if (record.peopleMode) {

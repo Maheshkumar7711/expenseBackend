@@ -17,4 +17,5 @@ export interface ReminderResponse {
   date: string;
   time: string;
   interval: ReminderInterval;
+  updatedAt: string;
 }

@@ -32,6 +32,7 @@ export interface GoalResponse {
   iconKey: string;
   tags: string[];
   achieved?: boolean;
+  updatedAt: string;
 }
 
 export interface SavingTransactionResponse {
@@ -40,6 +41,7 @@ export interface SavingTransactionResponse {
   amount: number;
   date: string;
   sourceAccountKey: string;
+  updatedAt: string;
 }
 
 export interface GoalsListResponse {

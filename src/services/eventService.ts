@@ -11,6 +11,7 @@ function toEventResponse(record: EventRecord): EventResponse {
     description: record.description,
     startDate: record.startDate,
     endDate: record.endDate,
+    updatedAt: record.updatedAt,
   };
 }
 

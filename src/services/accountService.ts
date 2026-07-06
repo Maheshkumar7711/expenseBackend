@@ -1,5 +1,5 @@
 import * as accountRepository from '../repositories/accountRepository';
-import { NotFoundError } from '../errors';
+import { ConflictError, NotFoundError } from '../errors';
 import type {
   AccountRecord,
   AccountResponse,
@@ -15,12 +15,76 @@ function generateAccountId(): string {
   return `acc-${Date.now()}-${random}`;
 }
 
+function normalizeAccountName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+async function loadActiveAccounts(userId: string): Promise<{
+  allAccounts: AccountRecord[];
+  deletedAccountNames: Record<string, string>;
+  activeAccounts: AccountRecord[];
+}> {
+  const [allAccounts, deletedNames] = await Promise.all([
+    accountRepository.listAccountsByUser(userId),
+    accountRepository.listDeletedAccountNames(userId),
+  ]);
+  const deletedAccountNames: Record<string, string> = {};
+  for (const entry of deletedNames) {
+    deletedAccountNames[entry.accountId] = entry.name;
+  }
+  const deletedIds = new Set(Object.keys(deletedAccountNames));
+  const activeAccounts = allAccounts.filter((account) => !deletedIds.has(account.id));
+  return { allAccounts, deletedAccountNames, activeAccounts };
+}
+
+function findDuplicateActiveAccount(
+  activeAccounts: AccountRecord[],
+  name: string,
+  excludeAccountId?: string,
+): AccountRecord | undefined {
+  const nameLower = normalizeAccountName(name);
+  return activeAccounts.find(
+    (account) =>
+      account.id !== excludeAccountId && normalizeAccountName(account.name) === nameLower,
+  );
+}
+
+function findDeletedNameConflict(
+  deletedAccountNames: Record<string, string>,
+  name: string,
+  excludeAccountId?: string,
+): string | undefined {
+  const nameLower = normalizeAccountName(name);
+  for (const [accountId, tombstoneName] of Object.entries(deletedAccountNames)) {
+    if (accountId === excludeAccountId) {
+      continue;
+    }
+    if (normalizeAccountName(tombstoneName) === nameLower) {
+      return tombstoneName;
+    }
+  }
+  return undefined;
+}
+
+function isAccountNameTaken(
+  activeAccounts: AccountRecord[],
+  deletedAccountNames: Record<string, string>,
+  name: string,
+  excludeAccountId?: string,
+): boolean {
+  if (findDuplicateActiveAccount(activeAccounts, name, excludeAccountId)) {
+    return true;
+  }
+  return findDeletedNameConflict(deletedAccountNames, name, excludeAccountId) != null;
+}
+
 function toAccountResponse(account: AccountRecord): AccountResponse {
   const response: AccountResponse = {
     id: account.id,
     type: account.type,
     name: account.name,
     openingBalance: account.openingBalance,
+    updatedAt: account.updatedAt,
   };
 
   if (account.deactivated) {
@@ -87,18 +151,30 @@ export async function createAccount(
   input: CreateAccountInput,
 ): Promise<AccountResponse> {
   const user = await ensureUser(clerkUserId);
+  const trimmedName = input.name.trim();
+  const { deletedAccountNames, activeAccounts } = await loadActiveAccounts(user.id);
+
+  if (isAccountNameTaken(activeAccounts, deletedAccountNames, trimmedName)) {
+    throw new ConflictError(
+      'An account with this name already exists',
+      'ACCOUNT_NAME_TAKEN',
+    );
+  }
 
   const id = input.id ?? generateAccountId();
   const existing = await accountRepository.findAccountById(user.id, id);
   if (existing) {
-    return toAccountResponse(existing);
+    const deletedIds = new Set(Object.keys(deletedAccountNames));
+    if (!deletedIds.has(existing.id)) {
+      return toAccountResponse(existing);
+    }
   }
 
   const account = await accountRepository.createAccount({
     id,
     userId: user.id,
     type: input.type,
-    name: input.name,
+    name: trimmedName,
     openingBalance: input.openingBalance,
     deactivated: input.deactivated,
     bankName: input.bankName,
@@ -131,7 +207,24 @@ export async function updateAccount(
     throw new NotFoundError('Account', accountId);
   }
 
-  const account = await accountRepository.updateAccount(user.id, accountId, input);
+  const nextName = input.name?.trim();
+  if (
+    nextName &&
+    normalizeAccountName(nextName) !== normalizeAccountName(existing.name)
+  ) {
+    const { activeAccounts, deletedAccountNames } = await loadActiveAccounts(user.id);
+    if (isAccountNameTaken(activeAccounts, deletedAccountNames, nextName, accountId)) {
+      throw new ConflictError(
+        'An account with this name already exists',
+        'ACCOUNT_NAME_TAKEN',
+      );
+    }
+  }
+
+  const account = await accountRepository.updateAccount(user.id, accountId, {
+    ...input,
+    ...(nextName ? { name: nextName } : {}),
+  });
   return toAccountResponse(account);
 }
 

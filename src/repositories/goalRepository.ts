@@ -110,6 +110,24 @@ export async function listSavingTransactions(
   });
 }
 
+export async function findSavingTransactionById(
+  userId: string,
+  savingTransactionId: string,
+): Promise<SavingTransactionRecord | null> {
+  return runSupabaseQuery(async () => {
+    const { data, error } = await getSupabaseAdmin()
+      .from('saving_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', savingTransactionId)
+      .maybeSingle();
+
+    if (error) wrapDbError(error);
+    if (!data) return null;
+    return mapSavingRow(data as SavingTransactionRow);
+  });
+}
+
 export interface CreateGoalInput {
   id: string;
   userId: string;

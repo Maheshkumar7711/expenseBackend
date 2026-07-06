@@ -11,6 +11,7 @@ export interface CustomCategoryResponse {
   id: string;
   name: string;
   linkedToKey: string;
+  updatedAt: string;
 }
 
 export interface CategoriesStateResponse {
@@ -45,4 +46,5 @@ export interface UserPreferencesResponse {
   selectedCurrencyCode: string | null;
   travelStartDate: string | null;
   travelEndDate: string | null;
+  updatedAt: string;
 }

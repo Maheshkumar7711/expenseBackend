@@ -11,6 +11,7 @@ function toReminderResponse(record: ReminderRecord): ReminderResponse {
     date: record.date,
     time: record.time,
     interval: record.interval,
+    updatedAt: record.updatedAt,
   };
 }
 

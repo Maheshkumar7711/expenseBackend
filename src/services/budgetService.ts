@@ -10,6 +10,7 @@ function toBudgetResponse(record: BudgetRecord): BudgetResponse {
     categoryKey: record.categoryKey,
     amount: record.amount,
     monthOnly: record.monthOnly,
+    updatedAt: record.updatedAt,
   };
   if (record.period) {
     response.period = record.period;
