@@ -119,6 +119,10 @@ export async function ensureUser(clerkUserId: string): Promise<UserRecord> {
 
 export async function getMe(clerkUserId: string): Promise<MeResponse> {
   const user = await ensureUser(clerkUserId);
+  return buildMeResponse(user);
+}
+
+export function buildMeResponse(user: UserRecord): MeResponse {
   return toMeResponse(user);
 }
 

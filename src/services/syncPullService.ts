@@ -15,10 +15,12 @@ export async function getChangesSince(
   const safeLimit = Math.min(Math.max(limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
   const sinceRevision = Math.max(0, since);
 
-  const changes = await changeLogRepository.listChangesSince(userId, sinceRevision, safeLimit + 1);
+  const [changes, serverRevision] = await Promise.all([
+    changeLogRepository.listChangesSince(userId, sinceRevision, safeLimit + 1),
+    changeLogService.getServerRevision(userId),
+  ]);
   const hasMore = changes.length > safeLimit;
   const page = hasMore ? changes.slice(0, safeLimit) : changes;
-  const serverRevision = await changeLogService.getServerRevision(userId);
 
   return {
     changes: page.map((entry) => ({
