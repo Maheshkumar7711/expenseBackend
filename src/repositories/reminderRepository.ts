@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { runSupabaseQuery } from '../utils/dbRetry';
+import { isActiveRow, softDeletePatch } from '../utils/softDelete';
 import type { ReminderInterval, ReminderRecord } from '../types/domain/reminder';
 
 interface ReminderRow {
@@ -33,11 +34,9 @@ function wrapDbError(error: { message: string }): never {
 
 export async function listReminders(userId: string): Promise<ReminderRecord[]> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('reminders')
-      .select('*')
-      .eq('user_id', userId)
-      .order('reminder_date', { ascending: true });
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin().from('reminders').select('*').eq('user_id', userId),
+    ).order('reminder_date', { ascending: true });
 
     if (error) wrapDbError(error);
     return (data as ReminderRow[]).map(mapReminderRow);
@@ -49,12 +48,13 @@ export async function findReminderById(
   reminderId: string,
 ): Promise<ReminderRecord | null> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('reminders')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('id', reminderId)
-      .maybeSingle();
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin()
+        .from('reminders')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('id', reminderId),
+    ).maybeSingle();
 
     if (error) wrapDbError(error);
     return data ? mapReminderRow(data as ReminderRow) : null;
@@ -126,9 +126,10 @@ export async function deleteReminder(userId: string, reminderId: string): Promis
   return runSupabaseQuery(async () => {
     const { error } = await getSupabaseAdmin()
       .from('reminders')
-      .delete()
+      .update(softDeletePatch())
       .eq('user_id', userId)
-      .eq('id', reminderId);
+      .eq('id', reminderId)
+      .filter('deleted_at', 'is', null);
 
     if (error) wrapDbError(error);
   });

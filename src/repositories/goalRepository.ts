@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { runSupabaseQuery } from '../utils/dbRetry';
+import { isActiveRow, softDeletePatch } from '../utils/softDelete';
 import type { GoalRecord, SavingTransactionRecord } from '../types/domain/goal';
 
 interface GoalRow {
@@ -67,11 +68,9 @@ function wrapDbError(error: { message: string }): never {
 
 export async function listGoals(userId: string): Promise<GoalRecord[]> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('goals')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true });
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin().from('goals').select('*').eq('user_id', userId),
+    ).order('created_at', { ascending: true });
 
     if (error) wrapDbError(error);
     return (data as GoalRow[]).map(mapGoalRow);
@@ -83,12 +82,13 @@ export async function findGoalById(
   goalId: string,
 ): Promise<GoalRecord | null> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('goals')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('id', goalId)
-      .maybeSingle();
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin()
+        .from('goals')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('id', goalId),
+    ).maybeSingle();
 
     if (error) wrapDbError(error);
     return data ? mapGoalRow(data as GoalRow) : null;
@@ -99,11 +99,9 @@ export async function listSavingTransactions(
   userId: string,
 ): Promise<SavingTransactionRecord[]> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('saving_transactions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false });
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin().from('saving_transactions').select('*').eq('user_id', userId),
+    ).order('date', { ascending: false });
 
     if (error) wrapDbError(error);
     return (data as SavingTransactionRow[]).map(mapSavingRow);
@@ -115,12 +113,13 @@ export async function findSavingTransactionById(
   savingTransactionId: string,
 ): Promise<SavingTransactionRecord | null> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('saving_transactions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('id', savingTransactionId)
-      .maybeSingle();
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin()
+        .from('saving_transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('id', savingTransactionId),
+    ).maybeSingle();
 
     if (error) wrapDbError(error);
     if (!data) return null;
@@ -205,9 +204,10 @@ export async function deleteGoal(userId: string, goalId: string): Promise<void> 
   return runSupabaseQuery(async () => {
     const { error } = await getSupabaseAdmin()
       .from('goals')
-      .delete()
+      .update(softDeletePatch())
       .eq('user_id', userId)
-      .eq('id', goalId);
+      .eq('id', goalId)
+      .filter('deleted_at', 'is', null);
 
     if (error) wrapDbError(error);
   });
@@ -249,21 +249,23 @@ export async function deleteSavingTransaction(
   contributionId: string,
 ): Promise<SavingTransactionRecord | null> {
   return runSupabaseQuery(async () => {
-    const { data: existing, error: findError } = await getSupabaseAdmin()
-      .from('saving_transactions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('id', contributionId)
-      .maybeSingle();
+    const { data: existing, error: findError } = await isActiveRow(
+      getSupabaseAdmin()
+        .from('saving_transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('id', contributionId),
+    ).maybeSingle();
 
     if (findError) wrapDbError(findError);
     if (!existing) return null;
 
     const { error } = await getSupabaseAdmin()
       .from('saving_transactions')
-      .delete()
+      .update(softDeletePatch())
       .eq('user_id', userId)
-      .eq('id', contributionId);
+      .eq('id', contributionId)
+      .filter('deleted_at', 'is', null);
 
     if (error) wrapDbError(error);
     return mapSavingRow(existing as SavingTransactionRow);

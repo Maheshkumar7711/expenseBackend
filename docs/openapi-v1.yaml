@@ -20,6 +20,7 @@ tags:
   - name: Categories
   - name: Preferences
   - name: Uploads
+  - name: Sync
 
 components:
   securitySchemes:
@@ -42,6 +43,44 @@ components:
             details:
               type: array
               items: {}
+
+    SyncPushOperation:
+      type: object
+      required: [operationId, entityType, operation, entityId]
+      properties:
+        operationId: { type: string }
+        entityType:
+          type: string
+          enum: [transaction, account, goal, savingContribution, budget, event, reminder, customCategory, disabledCategories, preferences, excludedRecurring]
+        operation:
+          type: string
+          enum: [create, update, delete]
+        entityId: { type: string }
+        parentId: { type: string, nullable: true }
+        payload: {}
+        clientUpdatedAt: { type: string, format: date-time }
+
+    SyncPushResult:
+      type: object
+      properties:
+        operationId: { type: string }
+        status:
+          type: string
+          enum: [applied, duplicate, rejected]
+        revision: { type: integer, nullable: true }
+        error: { type: string, nullable: true }
+
+    SyncChangeEntry:
+      type: object
+      properties:
+        entityType: { type: string }
+        entityId: { type: string }
+        operation:
+          type: string
+          enum: [upsert, delete]
+        revision: { type: integer }
+        payload: { nullable: true }
+        deletedAt: { type: string, format: date-time, nullable: true }
 
 security:
   - bearerAuth: []
@@ -352,3 +391,83 @@ paths:
       responses:
         '201':
           description: Returns avatarUrl
+
+  /api/v1/sync:
+    get:
+      tags: [Sync]
+      summary: Full bootstrap snapshot for cold start
+      responses:
+        '200':
+          description: All user data plus meta.serverRevision
+        '401':
+          description: Unauthorized
+
+  /api/v1/sync/changes:
+    get:
+      tags: [Sync]
+      summary: Incremental changes since revision cursor
+      parameters:
+        - name: since
+          in: query
+          required: true
+          schema: { type: integer, minimum: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 500 }
+      responses:
+        '200':
+          description: Change log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      changes:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SyncChangeEntry'
+                      serverRevision: { type: integer }
+                      hasMore: { type: boolean }
+        '401':
+          description: Unauthorized
+
+  /api/v1/sync/push:
+    post:
+      tags: [Sync]
+      summary: Batch apply client operations with idempotency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, operations]
+              properties:
+                deviceId: { type: string }
+                operations:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SyncPushOperation'
+      responses:
+        '200':
+          description: Per-operation results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SyncPushResult'
+                      serverRevision: { type: integer }
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized

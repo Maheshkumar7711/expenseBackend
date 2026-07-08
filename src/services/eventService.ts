@@ -3,6 +3,7 @@ import { NotFoundError } from '../errors';
 import type { EventRecord, EventResponse } from '../types/domain/event';
 import { generateId } from '../utils/generateId';
 import { ensureUser } from './userService';
+import { emitDelete, emitUpsert } from './syncChangeEmitter';
 
 function toEventResponse(record: EventRecord): EventResponse {
   return {
@@ -61,7 +62,9 @@ export async function createEvent(
     endDate: input.endDate,
   });
 
-  return toEventResponse(record);
+  const response = toEventResponse(record);
+  await emitUpsert(user.id, 'event', response.id, response);
+  return response;
 }
 
 export interface UpdateEventInput {
@@ -84,7 +87,9 @@ export async function updateEvent(
   }
 
   const record = await eventRepository.updateEvent(user.id, eventId, input);
-  return toEventResponse(record);
+  const response = toEventResponse(record);
+  await emitUpsert(user.id, 'event', response.id, response);
+  return response;
 }
 
 export async function deleteEvent(clerkUserId: string, eventId: string): Promise<void> {
@@ -96,4 +101,5 @@ export async function deleteEvent(clerkUserId: string, eventId: string): Promise
   }
 
   await eventRepository.deleteEvent(user.id, eventId);
+  await emitDelete(user.id, 'event', eventId);
 }

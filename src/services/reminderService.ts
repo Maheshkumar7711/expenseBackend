@@ -3,6 +3,7 @@ import { NotFoundError } from '../errors';
 import type { ReminderInterval, ReminderRecord, ReminderResponse } from '../types/domain/reminder';
 import { generateId } from '../utils/generateId';
 import { ensureUser } from './userService';
+import { emitDelete, emitUpsert } from './syncChangeEmitter';
 
 function toReminderResponse(record: ReminderRecord): ReminderResponse {
   return {
@@ -64,7 +65,9 @@ export async function createReminder(
     interval: input.interval,
   });
 
-  return toReminderResponse(record);
+  const response = toReminderResponse(record);
+  await emitUpsert(user.id, 'reminder', response.id, response);
+  return response;
 }
 
 export interface UpdateReminderInput {
@@ -87,7 +90,9 @@ export async function updateReminder(
   }
 
   const record = await reminderRepository.updateReminder(user.id, reminderId, input);
-  return toReminderResponse(record);
+  const response = toReminderResponse(record);
+  await emitUpsert(user.id, 'reminder', response.id, response);
+  return response;
 }
 
 export async function deleteReminder(clerkUserId: string, reminderId: string): Promise<void> {
@@ -99,4 +104,5 @@ export async function deleteReminder(clerkUserId: string, reminderId: string): P
   }
 
   await reminderRepository.deleteReminder(user.id, reminderId);
+  await emitDelete(user.id, 'reminder', reminderId);
 }

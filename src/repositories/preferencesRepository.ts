@@ -8,6 +8,7 @@ import type {
 } from '../types/domain/preferences';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { withDbRetry } from '../utils/dbRetry';
+import { isActiveRow, softDeletePatch } from '../utils/softDelete';
 
 interface PreferencesRow {
   user_id: string;
@@ -175,11 +176,9 @@ export async function listCustomCategories(userId: string): Promise<CustomCatego
 }
 
 async function listCustomCategoriesInternal(userId: string): Promise<CustomCategoryRecord[]> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('custom_categories')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true });
+  const { data, error } = await isActiveRow(
+    getSupabaseAdmin().from('custom_categories').select('*').eq('user_id', userId),
+  ).order('created_at', { ascending: true });
 
   if (error) wrapDbError(error);
   return (data as CustomCategoryRow[]).map(mapCustomCategoryRow);
@@ -196,12 +195,13 @@ async function findCustomCategoryByIdInternal(
   userId: string,
   categoryId: string,
 ): Promise<CustomCategoryRecord | null> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('custom_categories')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('id', categoryId)
-    .maybeSingle();
+  const { data, error } = await isActiveRow(
+    getSupabaseAdmin()
+      .from('custom_categories')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', categoryId),
+  ).maybeSingle();
 
   if (error) wrapDbError(error);
   return data ? mapCustomCategoryRow(data as CustomCategoryRow) : null;
@@ -282,9 +282,10 @@ export async function deleteCustomCategory(
 async function deleteCustomCategoryInternal(userId: string, categoryId: string): Promise<void> {
   const { error } = await getSupabaseAdmin()
     .from('custom_categories')
-    .delete()
+    .update(softDeletePatch())
     .eq('user_id', userId)
-    .eq('id', categoryId);
+    .eq('id', categoryId)
+    .filter('deleted_at', 'is', null);
 
   if (error) wrapDbError(error);
 }

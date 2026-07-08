@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { runSupabaseQuery } from '../utils/dbRetry';
+import { isActiveRow, softDeletePatch } from '../utils/softDelete';
 import type {
   AccountRecord,
   AccountType,
@@ -54,11 +55,9 @@ function wrapDbError(error: { message: string }): never {
 
 export async function listAccountsByUser(userId: string): Promise<AccountRecord[]> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('accounts')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true });
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin().from('accounts').select('*').eq('user_id', userId),
+    ).order('created_at', { ascending: true });
 
     if (error) {
       wrapDbError(error);
@@ -72,12 +71,13 @@ async function findAccountByIdInternal(
   userId: string,
   accountId: string,
 ): Promise<AccountRecord | null> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('accounts')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('id', accountId)
-    .maybeSingle();
+  const { data, error } = await isActiveRow(
+    getSupabaseAdmin()
+      .from('accounts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', accountId),
+  ).maybeSingle();
 
   if (error) {
     wrapDbError(error);
@@ -204,9 +204,10 @@ export async function deleteAccount(userId: string, accountId: string): Promise<
   return runSupabaseQuery(async () => {
     const { error } = await getSupabaseAdmin()
       .from('accounts')
-      .delete()
+      .update(softDeletePatch())
       .eq('user_id', userId)
-      .eq('id', accountId);
+      .eq('id', accountId)
+      .filter('deleted_at', 'is', null);
 
     if (error) {
       wrapDbError(error);

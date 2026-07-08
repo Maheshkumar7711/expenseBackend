@@ -11,6 +11,7 @@ import type { PaginationMeta } from '../utils/pagination';
 import { decodeCursor, encodeCursor } from '../utils/pagination';
 import { generateId } from '../utils/generateId';
 import { ensureUser } from './userService';
+import { emitDelete, emitUpsert } from './syncChangeEmitter';
 
 function toTransactionResponse(record: TransactionRecord): TransactionResponse {
   const response: TransactionResponse = {
@@ -213,7 +214,9 @@ export async function createTransaction(
     travelAmountForeign: input.travelAmountForeign ?? null,
   });
 
-  return toTransactionResponse(record);
+  const response = toTransactionResponse(record);
+  await emitUpsert(user.id, 'transaction', response.id, response);
+  return response;
 }
 
 export interface UpdateTransactionInput {
@@ -272,7 +275,9 @@ export async function updateTransaction(
     travelAmountForeign: input.travelAmountForeign,
   });
 
-  return toTransactionResponse(record);
+  const response = toTransactionResponse(record);
+  await emitUpsert(user.id, 'transaction', response.id, response);
+  return response;
 }
 
 export async function deleteTransaction(clerkUserId: string, transactionId: string): Promise<void> {
@@ -280,8 +285,9 @@ export async function deleteTransaction(clerkUserId: string, transactionId: stri
 
   const existing = await transactionRepository.findTransactionById(user.id, transactionId);
   if (!existing) {
-    throw new NotFoundError('Transaction', transactionId);
+    return;
   }
 
   await transactionRepository.deleteTransaction(user.id, transactionId);
+  await emitDelete(user.id, 'transaction', transactionId);
 }

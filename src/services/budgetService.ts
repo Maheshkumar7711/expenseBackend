@@ -3,6 +3,7 @@ import { NotFoundError } from '../errors';
 import type { BudgetRecord, BudgetResponse, BudgetsListResponse } from '../types/domain/budget';
 import { generateId } from '../utils/generateId';
 import { ensureUser } from './userService';
+import { emitDelete, emitUpsert } from './syncChangeEmitter';
 
 function toBudgetResponse(record: BudgetRecord): BudgetResponse {
   const response: BudgetResponse = {
@@ -83,7 +84,9 @@ export async function createBudget(
     period,
   });
 
-  return toBudgetResponse(record);
+  const response = toBudgetResponse(record);
+  await emitUpsert(user.id, 'budget', response.id, response);
+  return response;
 }
 
 export interface UpdateBudgetInput {
@@ -106,7 +109,9 @@ export async function updateBudget(
   }
 
   const record = await budgetRepository.updateBudget(user.id, budgetId, input);
-  return toBudgetResponse(record);
+  const response = toBudgetResponse(record);
+  await emitUpsert(user.id, 'budget', response.id, response);
+  return response;
 }
 
 export async function deleteBudget(
@@ -125,17 +130,26 @@ export async function deleteBudget(
 
   if (existing.monthOnly) {
     await budgetRepository.deleteBudget(user.id, budgetId);
+    await emitDelete(user.id, 'budget', budgetId);
     await budgetRepository.upsertExcludedRecurring(
       user.id,
       existing.categoryKey,
       period,
     );
+    await emitUpsert(user.id, 'excludedRecurring', `${existing.categoryKey}:${period}`, {
+      categoryKey: existing.categoryKey,
+      period,
+    });
   } else {
     await budgetRepository.upsertExcludedRecurring(
       user.id,
       existing.categoryKey,
       period,
     );
+    await emitUpsert(user.id, 'excludedRecurring', `${existing.categoryKey}:${period}`, {
+      categoryKey: existing.categoryKey,
+      period,
+    });
   }
 }
 
@@ -146,4 +160,8 @@ export async function addExcludedRecurring(
 ): Promise<void> {
   const user = await ensureUser(clerkUserId);
   await budgetRepository.upsertExcludedRecurring(user.id, categoryKey, period);
+  await emitUpsert(user.id, 'excludedRecurring', `${categoryKey}:${period}`, {
+    categoryKey,
+    period,
+  });
 }

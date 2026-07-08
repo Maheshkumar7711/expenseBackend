@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { runSupabaseQuery } from '../utils/dbRetry';
+import { isActiveRow, softDeletePatch } from '../utils/softDelete';
 import type { EventRecord } from '../types/domain/event';
 
 interface EventRow {
@@ -33,11 +34,9 @@ function wrapDbError(error: { message: string }): never {
 
 export async function listEvents(userId: string): Promise<EventRecord[]> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('events')
-      .select('*')
-      .eq('user_id', userId)
-      .order('start_date', { ascending: false });
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin().from('events').select('*').eq('user_id', userId),
+    ).order('start_date', { ascending: false });
 
     if (error) wrapDbError(error);
     return (data as EventRow[]).map(mapEventRow);
@@ -49,12 +48,13 @@ export async function findEventById(
   eventId: string,
 ): Promise<EventRecord | null> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('events')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('id', eventId)
-      .maybeSingle();
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin()
+        .from('events')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('id', eventId),
+    ).maybeSingle();
 
     if (error) wrapDbError(error);
     return data ? mapEventRow(data as EventRow) : null;
@@ -126,9 +126,10 @@ export async function deleteEvent(userId: string, eventId: string): Promise<void
   return runSupabaseQuery(async () => {
     const { error } = await getSupabaseAdmin()
       .from('events')
-      .delete()
+      .update(softDeletePatch())
       .eq('user_id', userId)
-      .eq('id', eventId);
+      .eq('id', eventId)
+      .filter('deleted_at', 'is', null);
 
     if (error) wrapDbError(error);
   });

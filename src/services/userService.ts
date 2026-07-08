@@ -3,6 +3,7 @@ import { deleteUserUploads } from '../integrations/supabaseStorage';
 import * as accountRepository from '../repositories/accountRepository';
 import * as preferencesRepository from '../repositories/preferencesRepository';
 import * as userDataRepository from '../repositories/userDataRepository';
+import * as changeLogService from './changeLogService';
 import * as userRepository from '../repositories/userRepository';
 import type { MeResponse, UserRecord } from '../types/domain/user';
 
@@ -177,6 +178,7 @@ export async function wipeUserData(clerkUserId: string): Promise<void> {
   const user = await ensureUser(clerkUserId);
 
   await userDataRepository.deleteAllUserData(user.id);
+  await changeLogService.resetSyncStateForUser(user.id);
   await deleteUserUploads(clerkUserId);
 
   const [updated] = await Promise.all([

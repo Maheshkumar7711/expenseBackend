@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { runSupabaseQuery } from '../utils/dbRetry';
+import { isActiveRow, softDeletePatch } from '../utils/softDelete';
 import type { BudgetRecord, ExcludedRecurringRecord } from '../types/domain/budget';
 
 interface BudgetRow {
@@ -43,11 +44,9 @@ function wrapDbError(error: { message: string }): never {
 
 export async function listBudgets(userId: string): Promise<BudgetRecord[]> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('budgets')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true });
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin().from('budgets').select('*').eq('user_id', userId),
+    ).order('created_at', { ascending: true });
 
     if (error) wrapDbError(error);
     return (data as BudgetRow[]).map(mapBudgetRow);
@@ -59,12 +58,13 @@ export async function findBudgetById(
   budgetId: string,
 ): Promise<BudgetRecord | null> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('budgets')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('id', budgetId)
-      .maybeSingle();
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin()
+        .from('budgets')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('id', budgetId),
+    ).maybeSingle();
 
     if (error) wrapDbError(error);
     return data ? mapBudgetRow(data as BudgetRow) : null;
@@ -75,10 +75,9 @@ export async function listExcludedRecurring(
   userId: string,
 ): Promise<ExcludedRecurringRecord[]> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('budget_excluded_recurring')
-      .select('*')
-      .eq('user_id', userId);
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin().from('budget_excluded_recurring').select('*').eq('user_id', userId),
+    );
 
     if (error) wrapDbError(error);
     return (data as ExcludedRow[]).map((row) => ({
@@ -154,9 +153,10 @@ export async function deleteBudget(userId: string, budgetId: string): Promise<vo
   return runSupabaseQuery(async () => {
     const { error } = await getSupabaseAdmin()
       .from('budgets')
-      .delete()
+      .update(softDeletePatch())
       .eq('user_id', userId)
-      .eq('id', budgetId);
+      .eq('id', budgetId)
+      .filter('deleted_at', 'is', null);
 
     if (error) wrapDbError(error);
   });

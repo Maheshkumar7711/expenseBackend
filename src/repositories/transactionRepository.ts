@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { runSupabaseQuery } from '../utils/dbRetry';
+import { isActiveRow, softDeletePatch } from '../utils/softDelete';
 import type {
   PeopleMode,
   RecurrenceSettings,
@@ -94,10 +95,12 @@ export async function listTransactions(
   options: ListTransactionsOptions,
 ): Promise<TransactionRecord[]> {
   return runSupabaseQuery(async () => {
-    let query = getSupabaseAdmin()
-      .from('transactions')
-      .select('*')
-      .eq('user_id', options.userId);
+    let query = isActiveRow(
+      getSupabaseAdmin()
+        .from('transactions')
+        .select('*')
+        .eq('user_id', options.userId),
+    );
 
     if (options.transactionType) {
       query = query.eq('transaction_type', options.transactionType);
@@ -165,10 +168,12 @@ export async function listAllTransactionsForUser(
   limit: number,
 ): Promise<TransactionRecord[]> {
   return runSupabaseQuery(async () => {
-    const { data, error } = await getSupabaseAdmin()
-      .from('transactions')
-      .select('*')
-      .eq('user_id', userId)
+    const { data, error } = await isActiveRow(
+      getSupabaseAdmin()
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId),
+    )
       .order('date', { ascending: false })
       .order('id', { ascending: false })
       .limit(limit);
@@ -185,12 +190,13 @@ async function findTransactionByIdInternal(
   userId: string,
   transactionId: string,
 ): Promise<TransactionRecord | null> {
-  const { data, error } = await getSupabaseAdmin()
-    .from('transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('id', transactionId)
-    .maybeSingle();
+  const { data, error } = await isActiveRow(
+    getSupabaseAdmin()
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', transactionId),
+  ).maybeSingle();
 
   if (error) {
     wrapDbError(error);
@@ -350,9 +356,10 @@ export async function deleteTransaction(userId: string, transactionId: string): 
   return runSupabaseQuery(async () => {
     const { data, error } = await getSupabaseAdmin()
       .from('transactions')
-      .delete()
+      .update(softDeletePatch())
       .eq('user_id', userId)
       .eq('id', transactionId)
+      .filter('deleted_at', 'is', null)
       .select('id');
 
     if (error) {
@@ -360,7 +367,7 @@ export async function deleteTransaction(userId: string, transactionId: string): 
     }
 
     if (!data?.length) {
-      throw new InternalServerError(`Transaction delete matched no rows: ${transactionId}`);
+      return;
     }
   });
 }
