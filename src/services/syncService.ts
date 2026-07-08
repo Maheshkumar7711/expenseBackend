@@ -5,9 +5,8 @@ import { listGoals } from './goalService';
 import { getPreferencesBootstrap } from './preferencesService';
 import { listReminders } from './reminderService';
 import { listAllTransactionsForSync } from './transactionService';
-import { getMe } from './userService';
+import { ensureUser, buildMeResponse } from './userService';
 import * as changeLogService from './changeLogService';
-import { ensureUser } from './userService';
 import type { AccountsListResponse } from '../types/domain/account';
 import type { BudgetsListResponse } from '../types/domain/budget';
 import type { EventResponse } from '../types/domain/event';
@@ -33,18 +32,23 @@ export interface BootstrapSyncData {
 
 /** Single round-trip bootstrap: profile, preferences, and all domain lists. */
 export async function getBootstrapSync(clerkUserId: string): Promise<BootstrapSyncData> {
-  const me = await getMe(clerkUserId);
   const user = await ensureUser(clerkUserId);
   await changeLogService.ensureUserSyncState(user.id);
-  const serverRevision = await changeLogService.getServerRevision(user.id);
 
-  const [{ preferences, categories }, accounts, transactions] = await Promise.all([
+  const [
+    serverRevision,
+    { preferences, categories },
+    accounts,
+    transactions,
+    budgets,
+    goals,
+    events,
+    reminders,
+  ] = await Promise.all([
+    changeLogService.getServerRevision(user.id),
     getPreferencesBootstrap(clerkUserId),
     listAccounts(clerkUserId),
     listAllTransactionsForSync(clerkUserId),
-  ]);
-
-  const [budgets, goals, events, reminders] = await Promise.all([
     listBudgets(clerkUserId),
     listGoals(clerkUserId),
     listEvents(clerkUserId),
@@ -52,7 +56,7 @@ export async function getBootstrapSync(clerkUserId: string): Promise<BootstrapSy
   ]);
 
   return {
-    me,
+    me: buildMeResponse(user),
     preferences,
     categories,
     accounts,
