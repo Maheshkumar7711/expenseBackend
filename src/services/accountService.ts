@@ -7,6 +7,7 @@ import type {
   AccountType,
 } from '../types/domain/account';
 import { ensureUser } from './userService';
+import { emitDelete, emitUpsert } from './syncChangeEmitter';
 
 const PROTECTED_ACCOUNT_IDS = new Set(['cash', 'savings']);
 
@@ -182,7 +183,9 @@ export async function createAccount(
     iconKey: input.iconKey,
   });
 
-  return toAccountResponse(account);
+  const response = toAccountResponse(account);
+  await emitUpsert(user.id, 'account', response.id, response);
+  return response;
 }
 
 export interface UpdateAccountInput {
@@ -225,7 +228,9 @@ export async function updateAccount(
     ...input,
     ...(nextName ? { name: nextName } : {}),
   });
-  return toAccountResponse(account);
+  const response = toAccountResponse(account);
+  await emitUpsert(user.id, 'account', response.id, response);
+  return response;
 }
 
 export async function deleteAccount(clerkUserId: string, accountId: string): Promise<void> {
@@ -237,6 +242,8 @@ export async function deleteAccount(clerkUserId: string, accountId: string): Pro
   }
 
   await accountRepository.upsertDeletedAccountName(user.id, accountId, existing.name);
+
+  await emitDelete(user.id, 'account', accountId, { name: existing.name });
 
   // Default accounts stay in DB for transaction references; hide via deleted_account_names.
   if (PROTECTED_ACCOUNT_IDS.has(accountId)) {

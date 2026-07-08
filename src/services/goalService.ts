@@ -9,6 +9,7 @@ import type {
 } from '../types/domain/goal';
 import { generateId } from '../utils/generateId';
 import { ensureUser } from './userService';
+import { emitDelete, emitUpsert } from './syncChangeEmitter';
 
 function toGoalResponse(record: GoalRecord): GoalResponse {
   const response: GoalResponse = {
@@ -98,7 +99,9 @@ export async function createGoal(
     achieved: input.achieved,
   });
 
-  return toGoalResponse(record);
+  const response = toGoalResponse(record);
+  await emitUpsert(user.id, 'goal', response.id, response);
+  return response;
 }
 
 export interface UpdateGoalInput {
@@ -124,7 +127,9 @@ export async function updateGoal(
   }
 
   const record = await goalRepository.updateGoal(user.id, goalId, input);
-  return toGoalResponse(record);
+  const response = toGoalResponse(record);
+  await emitUpsert(user.id, 'goal', response.id, response);
+  return response;
 }
 
 export async function deleteGoal(clerkUserId: string, goalId: string): Promise<void> {
@@ -136,6 +141,7 @@ export async function deleteGoal(clerkUserId: string, goalId: string): Promise<v
   }
 
   await goalRepository.deleteGoal(user.id, goalId);
+  await emitDelete(user.id, 'goal', goalId);
 }
 
 export interface CreateContributionInput {
@@ -176,7 +182,13 @@ export async function createContribution(
     savedAmount: goal.savedAmount + input.amount,
   });
 
-  return toSavingResponse(record);
+  const response = toSavingResponse(record);
+  await emitUpsert(user.id, 'savingContribution', response.id, response);
+  const goalResponse = toGoalResponse(
+    (await goalRepository.findGoalById(user.id, goalId))!,
+  );
+  await emitUpsert(user.id, 'goal', goalResponse.id, goalResponse);
+  return response;
 }
 
 export async function deleteContribution(
@@ -199,4 +211,10 @@ export async function deleteContribution(
   await goalRepository.updateGoal(user.id, goalId, {
     savedAmount: Math.max(0, goal.savedAmount - deleted.amount),
   });
+
+  await emitDelete(user.id, 'savingContribution', contributionId);
+  const goalResponse = toGoalResponse(
+    (await goalRepository.findGoalById(user.id, goalId))!,
+  );
+  await emitUpsert(user.id, 'goal', goalResponse.id, goalResponse);
 }

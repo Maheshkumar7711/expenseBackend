@@ -11,6 +11,7 @@ import type {
 } from '../types/domain/preferences';
 import { generateId } from '../utils/generateId';
 import { ensureUser } from './userService';
+import { emitDelete, emitUpsert } from './syncChangeEmitter';
 
 function toPreferencesResponse(record: UserPreferencesRecord): UserPreferencesResponse {
   return {
@@ -97,7 +98,9 @@ export async function updatePreferences(
     travelEndDate: input.travelEndDate,
   });
 
-  return toPreferencesResponse(record);
+  const response = toPreferencesResponse(record);
+  await emitUpsert(user.id, 'preferences', 'user', response);
+  return response;
 }
 
 export async function getCategoriesState(clerkUserId: string): Promise<CategoriesStateResponse> {
@@ -120,7 +123,9 @@ export async function updateDisabledCategories(
 ): Promise<CategoriesStateResponse> {
   const user = await ensureUser(clerkUserId);
   await preferencesRepository.updatePreferences(user.id, { disabledCategoryKeys });
-  return getCategoriesState(clerkUserId);
+  const state = await getCategoriesState(clerkUserId);
+  await emitUpsert(user.id, 'disabledCategories', 'user', state.disabledCategoryKeys);
+  return state;
 }
 
 export interface CreateCustomCategoryInput {
@@ -148,7 +153,9 @@ export async function createCustomCategory(
     linkedToKey: input.linkedToKey,
   });
 
-  return toCustomCategoryResponse(record);
+  const response = toCustomCategoryResponse(record);
+  await emitUpsert(user.id, 'customCategory', response.id, response);
+  return response;
 }
 
 export interface UpdateCustomCategoryInput {
@@ -169,7 +176,9 @@ export async function updateCustomCategory(
   }
 
   const record = await preferencesRepository.updateCustomCategory(user.id, categoryId, input);
-  return toCustomCategoryResponse(record);
+  const response = toCustomCategoryResponse(record);
+  await emitUpsert(user.id, 'customCategory', response.id, response);
+  return response;
 }
 
 export async function deleteCustomCategory(
@@ -184,4 +193,5 @@ export async function deleteCustomCategory(
   }
 
   await preferencesRepository.deleteCustomCategory(user.id, categoryId);
+  await emitDelete(user.id, 'customCategory', categoryId);
 }
