@@ -6,6 +6,7 @@ import * as userDataRepository from '../repositories/userDataRepository';
 import * as changeLogService from './changeLogService';
 import * as userRepository from '../repositories/userRepository';
 import type { MeResponse, UserRecord } from '../types/domain/user';
+import { getLogger } from '../utils/logger';
 
 const DEFAULT_ACCOUNTS = [
   { id: 'cash', type: 'cash' as const, name: 'Cash', iconKey: 'walletOutline' },
@@ -46,15 +47,48 @@ async function fetchClerkProfile(clerkUserId: string): Promise<{ email: string; 
   }
 }
 
+const profileBackfillInflight = new Map<string, Promise<void>>();
+
+function queueProfileBackfill(clerkUserId: string, existing: UserRecord): void {
+  if (profileBackfillInflight.has(clerkUserId)) {
+    return;
+  }
+
+  const job = (async () => {
+    const profile = await fetchClerkProfile(clerkUserId);
+    if (!profile.email.trim() && !profile.name.trim()) {
+      return;
+    }
+    const nextEmail = existing.email.trim() ? existing.email : profile.email;
+    const nextName = existing.name.trim() ? existing.name : profile.name;
+    if (nextEmail === existing.email && nextName === existing.name) {
+      return;
+    }
+    const updated = await userRepository.updateUser(clerkUserId, {
+      email: nextEmail,
+      name: nextName,
+    });
+    setCachedUser(clerkUserId, updated);
+  })()
+    .catch((error) => {
+      getLogger().warn(
+        { clerkUserId, error: error instanceof Error ? error.message : String(error) },
+        'async user profile backfill failed',
+      );
+    })
+    .finally(() => {
+      profileBackfillInflight.delete(clerkUserId);
+    });
+
+  profileBackfillInflight.set(clerkUserId, job);
+}
+
 async function ensureUserInternal(clerkUserId: string): Promise<UserRecord> {
   const existing = await userRepository.findUserByClerkId(clerkUserId);
   if (existing) {
     if (!existing.email.trim() || !existing.name.trim()) {
-      const profile = await fetchClerkProfile(clerkUserId);
-      return userRepository.updateUser(clerkUserId, {
-        email: existing.email.trim() ? existing.email : profile.email,
-        name: existing.name.trim() ? existing.name : profile.name,
-      });
+      // Do not block /me on third-party profile fetches.
+      queueProfileBackfill(clerkUserId, existing);
     }
     return existing;
   }
