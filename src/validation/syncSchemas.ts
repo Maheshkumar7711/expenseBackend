@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SYNC_PUSH_BATCH_MAX } from '../constants/sync';
 
 const syncEntityTypeSchema = z.enum([
   'transaction',
@@ -31,7 +32,9 @@ export const syncPushOperationBodySchema = z
 export const syncPushBodySchema = z
   .object({
     deviceId: z.string().trim().min(1).max(128),
-    operations: z.array(syncPushOperationBodySchema).max(200),
+    operations: z
+      .array(syncPushOperationBodySchema)
+      .max(SYNC_PUSH_BATCH_MAX, `At most ${SYNC_PUSH_BATCH_MAX} operations per push batch`),
   })
   .strict();
 
