@@ -5,6 +5,32 @@ import { generateId } from '../utils/generateId';
 import { ensureUser } from './userService';
 import { emitDelete, emitUpsert } from './syncChangeEmitter';
 
+function excludedRecurringEntityId(categoryKey: string, period: string): string {
+  return `${categoryKey}:${period}`;
+}
+
+/** Clear DB exclusions for a category and emit sync deletes so other devices drop stale entries. */
+async function clearExcludedRecurringForCategoryWithSync(
+  userId: string,
+  categoryKey: string,
+): Promise<void> {
+  const excluded = await budgetRepository.listExcludedRecurring(userId);
+  const toClear = excluded.filter((entry) => entry.categoryKey === categoryKey);
+  if (toClear.length === 0) {
+    return;
+  }
+
+  await budgetRepository.clearExcludedRecurringForCategory(userId, categoryKey);
+
+  for (const entry of toClear) {
+    await emitDelete(
+      userId,
+      'excludedRecurring',
+      excludedRecurringEntityId(entry.categoryKey, entry.period),
+    );
+  }
+}
+
 function toBudgetResponse(record: BudgetRecord): BudgetResponse {
   const response: BudgetResponse = {
     id: record.id,
@@ -72,7 +98,7 @@ export async function createBudget(
     );
   } else {
     await budgetRepository.deleteRecurringBudgetsForCategory(user.id, input.categoryKey);
-    await budgetRepository.clearExcludedRecurringForCategory(user.id, input.categoryKey);
+    await clearExcludedRecurringForCategoryWithSync(user.id, input.categoryKey);
   }
 
   const record = await budgetRepository.createBudget({
@@ -136,7 +162,7 @@ export async function deleteBudget(
       existing.categoryKey,
       period,
     );
-    await emitUpsert(user.id, 'excludedRecurring', `${existing.categoryKey}:${period}`, {
+    await emitUpsert(user.id, 'excludedRecurring', excludedRecurringEntityId(existing.categoryKey, period), {
       categoryKey: existing.categoryKey,
       period,
     });
@@ -146,7 +172,7 @@ export async function deleteBudget(
       existing.categoryKey,
       period,
     );
-    await emitUpsert(user.id, 'excludedRecurring', `${existing.categoryKey}:${period}`, {
+    await emitUpsert(user.id, 'excludedRecurring', excludedRecurringEntityId(existing.categoryKey, period), {
       categoryKey: existing.categoryKey,
       period,
     });
@@ -160,7 +186,7 @@ export async function addExcludedRecurring(
 ): Promise<void> {
   const user = await ensureUser(clerkUserId);
   await budgetRepository.upsertExcludedRecurring(user.id, categoryKey, period);
-  await emitUpsert(user.id, 'excludedRecurring', `${categoryKey}:${period}`, {
+  await emitUpsert(user.id, 'excludedRecurring', excludedRecurringEntityId(categoryKey, period), {
     categoryKey,
     period,
   });

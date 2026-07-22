@@ -213,10 +213,24 @@ async function applyOperation(
       return { status: 'applied', revision, error: null };
     }
     case 'customCategory': {
-      const created = await preferencesService.createCustomCategory(
-        clerkUserId,
-        payload as Parameters<typeof preferencesService.createCustomCategory>[1],
-      );
+      if (op.operation === 'create') {
+        await preferencesService.createCustomCategory(
+          clerkUserId,
+          payload as Parameters<typeof preferencesService.createCustomCategory>[1],
+        );
+        const revision = await latestRevision(userId);
+        return { status: 'applied', revision, error: null };
+      }
+      if (op.operation === 'update') {
+        await preferencesService.updateCustomCategory(
+          clerkUserId,
+          op.entityId,
+          payload as Parameters<typeof preferencesService.updateCustomCategory>[2],
+        );
+        const revision = await latestRevision(userId);
+        return { status: 'applied', revision, error: null };
+      }
+      await preferencesService.deleteCustomCategory(clerkUserId, op.entityId);
       const revision = await latestRevision(userId);
       return { status: 'applied', revision, error: null };
     }
