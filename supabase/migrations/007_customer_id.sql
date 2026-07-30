@@ -7,7 +7,7 @@ create sequence if not exists public.customer_id_seq start 1;
 alter table public.users
   add column if not exists customer_id text;
 
--- Backfill any existing rows (empty DB after fresh 001–008 has none).
+-- Backfill any existing rows (empty DB after fresh 001–006 has none).
 update public.users
 set customer_id = lpad(nextval('public.customer_id_seq')::text, 6, '0')
 where customer_id is null;
@@ -35,23 +35,3 @@ create trigger users_assign_customer_id
 before insert on public.users
 for each row
 execute function public.assign_customer_id();
-
--- Refresh summary view to expose customer_id for support lookups.
--- Must DROP first: CREATE OR REPLACE cannot insert a column in the middle.
-drop view if exists public.v_user_summary;
-
-create view public.v_user_summary as
-select
-  u.id as user_id,
-  u.clerk_user_id,
-  u.customer_id,
-  u.email,
-  u.name,
-  u.has_completed_onboarding,
-  (select count(*) from public.accounts a where a.user_id = u.id) as account_count,
-  (select count(*) from public.transactions t where t.user_id = u.id) as transaction_count,
-  u.created_at
-from public.users u;
-
-comment on view public.v_user_summary is
-  'One row per user with resource counts and customer_id. Start here when debugging.';

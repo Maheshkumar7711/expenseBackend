@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { runSupabaseQuery } from '../utils/dbRetry';
-import { isActiveRow, softDeletePatch } from '../utils/softDelete';
+import { isActiveRow } from '../utils/softDelete';
 import type { BudgetRecord, ExcludedRecurringRecord } from '../types/domain/budget';
 
 interface BudgetRow {
@@ -153,10 +153,9 @@ export async function deleteBudget(userId: string, budgetId: string): Promise<vo
   return runSupabaseQuery(async () => {
     const { error } = await getSupabaseAdmin()
       .from('budgets')
-      .update(softDeletePatch())
+      .delete()
       .eq('user_id', userId)
-      .eq('id', budgetId)
-      .filter('deleted_at', 'is', null);
+      .eq('id', budgetId);
 
     if (error) wrapDbError(error);
   });

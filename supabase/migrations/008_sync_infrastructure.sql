@@ -1,5 +1,7 @@
--- Sync v2 infrastructure: change log, idempotency, soft deletes, revisions
--- Run after 001–009
+-- Soft delete on domain tables + sync infrastructure.
+-- Per-row `revision` is NOT stored on domain tables — sync uses
+-- user_sync_state.server_revision and change_log.revision only.
+-- Run after 001–007.
 
 begin;
 
@@ -50,7 +52,7 @@ create index if not exists processed_operations_expires_idx
   on public.processed_operations (expires_at);
 
 -- ---------------------------------------------------------------------------
--- Soft delete + revision on domain tables
+-- Soft delete on domain tables (required for sync tombstones)
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -74,10 +76,6 @@ begin
       'alter table public.%I add column if not exists deleted_at timestamptz',
       tbl
     );
-    execute format(
-      'alter table public.%I add column if not exists revision bigint not null default 0',
-      tbl
-    );
   end loop;
 end $$;
 
@@ -88,36 +86,20 @@ alter table public.budget_excluded_recurring
 alter table public.deleted_account_names
   add column if not exists updated_at timestamptz not null default now();
 
--- Indexes for incremental queries and active-row filters
-create index if not exists transactions_user_revision_idx
-  on public.transactions (user_id, revision);
-
+-- Useful for list/sync ordering (not per-row revision)
 create index if not exists transactions_user_updated_at_idx
   on public.transactions (user_id, updated_at);
-
-create index if not exists accounts_user_revision_idx
-  on public.accounts (user_id, revision);
 
 create index if not exists accounts_user_updated_at_idx
   on public.accounts (user_id, updated_at);
 
-create index if not exists budgets_user_revision_idx
-  on public.budgets (user_id, revision);
+create index if not exists transactions_user_deleted_at_idx
+  on public.transactions (user_id)
+  where deleted_at is null;
 
-create index if not exists goals_user_revision_idx
-  on public.goals (user_id, revision);
-
-create index if not exists events_user_revision_idx
-  on public.events (user_id, revision);
-
-create index if not exists reminders_user_revision_idx
-  on public.reminders (user_id, revision);
-
-create index if not exists saving_transactions_user_revision_idx
-  on public.saving_transactions (user_id, revision);
-
-create index if not exists custom_categories_user_revision_idx
-  on public.custom_categories (user_id, revision);
+create index if not exists accounts_user_deleted_at_idx
+  on public.accounts (user_id)
+  where deleted_at is null;
 
 -- Initialize user_sync_state for existing users
 insert into public.user_sync_state (user_id, server_revision)

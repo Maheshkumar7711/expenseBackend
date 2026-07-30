@@ -11,3 +11,5 @@ coverage/
 
 #tests
 tests
+skills-lock.json
+.agents

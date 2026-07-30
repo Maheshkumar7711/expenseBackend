@@ -14,6 +14,7 @@ import { reminderRouter } from './reminderRoutes';
 import { syncRouter } from './syncRoutes';
 import { transactionRouter } from './transactionRoutes';
 import { uploadRouter } from './uploadRoutes';
+import { backupRouter } from './backupRoutes';
 
 export const v1Router = Router();
 
@@ -27,6 +28,7 @@ v1Router.use(createWriteRateLimiter());
 v1Router.use('/me/preferences', preferencesRouter);
 v1Router.use('/me', meRouter);
 v1Router.use('/sync', syncRouter);
+v1Router.use('/backups', backupRouter);
 v1Router.use('/accounts', accountRouter);
 v1Router.use('/transactions', transactionRouter);
 v1Router.use('/budgets', budgetRouter);
