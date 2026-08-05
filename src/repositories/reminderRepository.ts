@@ -2,6 +2,10 @@ import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { runSupabaseQuery } from '../utils/dbRetry';
 import { isActiveRow, softDeletePatch } from '../utils/softDelete';
+import {
+  applyOptionalCreateTimestamps,
+  type OptionalCreateTimestamps,
+} from '../utils/createTimestamps';
 import type { ReminderInterval, ReminderRecord } from '../types/domain/reminder';
 
 interface ReminderRow {
@@ -61,7 +65,7 @@ export async function findReminderById(
   });
 }
 
-export interface CreateReminderInput {
+export interface CreateReminderInput extends OptionalCreateTimestamps {
   id: string;
   userId: string;
   title: string;
@@ -72,16 +76,19 @@ export interface CreateReminderInput {
 
 export async function createReminder(input: CreateReminderInput): Promise<ReminderRecord> {
   return runSupabaseQuery(async () => {
+    const row: Record<string, unknown> = {
+      id: input.id,
+      user_id: input.userId,
+      title: input.title,
+      reminder_date: input.date,
+      reminder_time: input.time,
+      reminder_interval: input.interval,
+    };
+    applyOptionalCreateTimestamps(row, input);
+
     const { data, error } = await getSupabaseAdmin()
       .from('reminders')
-      .insert({
-        id: input.id,
-        user_id: input.userId,
-        title: input.title,
-        reminder_date: input.date,
-        reminder_time: input.time,
-        reminder_interval: input.interval,
-      })
+      .insert(row)
       .select('*')
       .single();
 

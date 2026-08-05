@@ -3,6 +3,10 @@ import { InternalServerError } from '../errors';
 import { isUniqueViolation } from '../utils/dbErrors';
 import { runSupabaseQuery } from '../utils/dbRetry';
 import { isActiveRow, softDeletePatch } from '../utils/softDelete';
+import {
+  applyOptionalCreateTimestamps,
+  type OptionalCreateTimestamps,
+} from '../utils/createTimestamps';
 import type {
   AccountRecord,
   AccountType,
@@ -114,7 +118,7 @@ export async function listDeletedAccountNames(
   });
 }
 
-export interface CreateAccountInput {
+export interface CreateAccountInput extends OptionalCreateTimestamps {
   id: string;
   userId: string;
   type: AccountType;
@@ -128,19 +132,22 @@ export interface CreateAccountInput {
 
 export async function createAccount(input: CreateAccountInput): Promise<AccountRecord> {
   return runSupabaseQuery(async () => {
+    const row: Record<string, unknown> = {
+      id: input.id,
+      user_id: input.userId,
+      type: input.type,
+      name: input.name,
+      opening_balance: input.openingBalance,
+      deactivated: input.deactivated ?? false,
+      bank_name: input.bankName ?? null,
+      bank_key: input.bankKey ?? null,
+      icon_key: input.iconKey ?? null,
+    };
+    applyOptionalCreateTimestamps(row, input);
+
     const { data, error } = await getSupabaseAdmin()
       .from('accounts')
-      .insert({
-        id: input.id,
-        user_id: input.userId,
-        type: input.type,
-        name: input.name,
-        opening_balance: input.openingBalance,
-        deactivated: input.deactivated ?? false,
-        bank_name: input.bankName ?? null,
-        bank_key: input.bankKey ?? null,
-        icon_key: input.iconKey ?? null,
-      })
+      .insert(row)
       .select('*')
       .single();
 

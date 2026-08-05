@@ -2,6 +2,10 @@ import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { runSupabaseQuery } from '../utils/dbRetry';
 import { isActiveRow, softDeletePatch } from '../utils/softDelete';
+import {
+  applyOptionalCreateTimestamps,
+  type OptionalCreateTimestamps,
+} from '../utils/createTimestamps';
 import type { EventRecord } from '../types/domain/event';
 
 interface EventRow {
@@ -61,7 +65,7 @@ export async function findEventById(
   });
 }
 
-export interface CreateEventInput {
+export interface CreateEventInput extends OptionalCreateTimestamps {
   id: string;
   userId: string;
   name: string;
@@ -72,16 +76,19 @@ export interface CreateEventInput {
 
 export async function createEvent(input: CreateEventInput): Promise<EventRecord> {
   return runSupabaseQuery(async () => {
+    const row: Record<string, unknown> = {
+      id: input.id,
+      user_id: input.userId,
+      name: input.name,
+      description: input.description,
+      start_date: input.startDate,
+      end_date: input.endDate,
+    };
+    applyOptionalCreateTimestamps(row, input);
+
     const { data, error } = await getSupabaseAdmin()
       .from('events')
-      .insert({
-        id: input.id,
-        user_id: input.userId,
-        name: input.name,
-        description: input.description,
-        start_date: input.startDate,
-        end_date: input.endDate,
-      })
+      .insert(row)
       .select('*')
       .single();
 

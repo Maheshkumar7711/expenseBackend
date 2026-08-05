@@ -12,4 +12,5 @@ meRouter.patch(
   validate({ body: updateProfileBodySchema }),
   asyncHandler(userController.updateMe),
 );
+meRouter.delete('/', asyncHandler(userController.deleteMe));
 meRouter.delete('/data', asyncHandler(userController.wipeMyData));

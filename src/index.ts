@@ -18,7 +18,7 @@ function logDevOpsWarnings(): void {
   }
   if (!config.clerk.webhookSigningSecret) {
     logger.warn(
-      'CLERK_WEBHOOK_SIGNING_SECRET is not set — POST /webhooks/clerk returns 503; Delete Account will not clean backend data.',
+      'CLERK_WEBHOOK_SIGNING_SECRET is not set — POST /webhooks/clerk returns 503; Clerk Dashboard user deletes will not clean backend data.',
     );
   }
   if (!config.supabase.url || !config.supabase.serviceRoleKey) {

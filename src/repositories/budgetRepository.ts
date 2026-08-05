@@ -2,6 +2,10 @@ import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { runSupabaseQuery } from '../utils/dbRetry';
 import { isActiveRow } from '../utils/softDelete';
+import {
+  applyOptionalCreateTimestamps,
+  type OptionalCreateTimestamps,
+} from '../utils/createTimestamps';
 import type { BudgetRecord, ExcludedRecurringRecord } from '../types/domain/budget';
 
 interface BudgetRow {
@@ -88,7 +92,7 @@ export async function listExcludedRecurring(
   });
 }
 
-export interface CreateBudgetInput {
+export interface CreateBudgetInput extends OptionalCreateTimestamps {
   id: string;
   userId: string;
   categoryKey: string;
@@ -99,16 +103,19 @@ export interface CreateBudgetInput {
 
 export async function createBudget(input: CreateBudgetInput): Promise<BudgetRecord> {
   return runSupabaseQuery(async () => {
+    const row: Record<string, unknown> = {
+      id: input.id,
+      user_id: input.userId,
+      category_key: input.categoryKey,
+      amount: input.amount,
+      month_only: input.monthOnly,
+      period: input.period ?? null,
+    };
+    applyOptionalCreateTimestamps(row, input);
+
     const { data, error } = await getSupabaseAdmin()
       .from('budgets')
-      .insert({
-        id: input.id,
-        user_id: input.userId,
-        category_key: input.categoryKey,
-        amount: input.amount,
-        month_only: input.monthOnly,
-        period: input.period ?? null,
-      })
+      .insert(row)
       .select('*')
       .single();
 

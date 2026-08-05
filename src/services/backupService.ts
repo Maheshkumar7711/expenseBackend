@@ -1,5 +1,6 @@
 import * as backupRepository from '../repositories/backupRepository';
-import { NotFoundError } from '../errors';
+import { BadRequestError, NotFoundError } from '../errors';
+import { isBackupPayloadEmpty } from '../utils/isBackupPayloadEmpty';
 import { ensureUser } from './userService';
 import { getBootstrapSync } from './syncService';
 import { applyBackupPayloadToLive } from './backupRestoreApplier';
@@ -46,6 +47,14 @@ export async function createOrReplaceBackup(clerkUserId: string): Promise<Backup
   const user = await ensureUser(clerkUserId);
   const bootstrap = await getBootstrapSync(clerkUserId);
   const payload = buildPayloadFromBootstrap(bootstrap);
+
+  if (isBackupPayloadEmpty(payload)) {
+    throw new BadRequestError(
+      'There is no app data to back up yet. Add transactions, accounts, or other data first.',
+      'BACKUP_EMPTY',
+    );
+  }
+
   const payloadJson = JSON.stringify(payload);
   const byteSize = Buffer.byteLength(payloadJson, 'utf8');
 

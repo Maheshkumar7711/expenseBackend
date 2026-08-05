@@ -58,6 +58,7 @@ export async function handleClerkWebhook(req: Request, res: Response): Promise<v
   if (event.type === 'user.deleted') {
     const clerkUserId = event.data.id;
     if (clerkUserId) {
+      // Clerk Dashboard / external delete — DB cleanup only (Clerk user already removed).
       await userService.deleteUserByClerkId(clerkUserId);
       getLogger().info(
         { clerkUserId, requestId: req.requestId, eventType: 'user.deleted' },

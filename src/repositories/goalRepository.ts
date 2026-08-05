@@ -2,6 +2,10 @@ import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { runSupabaseQuery } from '../utils/dbRetry';
 import { isActiveRow, softDeletePatch } from '../utils/softDelete';
+import {
+  applyOptionalCreateTimestamps,
+  type OptionalCreateTimestamps,
+} from '../utils/createTimestamps';
 import type { GoalRecord, SavingTransactionRecord } from '../types/domain/goal';
 
 interface GoalRow {
@@ -127,7 +131,7 @@ export async function findSavingTransactionById(
   });
 }
 
-export interface CreateGoalInput {
+export interface CreateGoalInput extends OptionalCreateTimestamps {
   id: string;
   userId: string;
   name: string;
@@ -141,19 +145,22 @@ export interface CreateGoalInput {
 
 export async function createGoal(input: CreateGoalInput): Promise<GoalRecord> {
   return runSupabaseQuery(async () => {
+    const row: Record<string, unknown> = {
+      id: input.id,
+      user_id: input.userId,
+      name: input.name,
+      target_date: input.targetDate,
+      target_amount: input.targetAmount,
+      saved_amount: input.savedAmount ?? 0,
+      icon_key: input.iconKey,
+      tags: input.tags ?? [],
+      achieved: input.achieved ?? false,
+    };
+    applyOptionalCreateTimestamps(row, input);
+
     const { data, error } = await getSupabaseAdmin()
       .from('goals')
-      .insert({
-        id: input.id,
-        user_id: input.userId,
-        name: input.name,
-        target_date: input.targetDate,
-        target_amount: input.targetAmount,
-        saved_amount: input.savedAmount ?? 0,
-        icon_key: input.iconKey,
-        tags: input.tags ?? [],
-        achieved: input.achieved ?? false,
-      })
+      .insert(row)
       .select('*')
       .single();
 
@@ -213,7 +220,7 @@ export async function deleteGoal(userId: string, goalId: string): Promise<void> 
   });
 }
 
-export interface CreateSavingTransactionInput {
+export interface CreateSavingTransactionInput extends OptionalCreateTimestamps {
   id: string;
   userId: string;
   goalId: string;
@@ -226,16 +233,19 @@ export async function createSavingTransaction(
   input: CreateSavingTransactionInput,
 ): Promise<SavingTransactionRecord> {
   return runSupabaseQuery(async () => {
+    const row: Record<string, unknown> = {
+      id: input.id,
+      user_id: input.userId,
+      goal_id: input.goalId,
+      amount: input.amount,
+      date: input.date,
+      source_account_key: input.sourceAccountKey,
+    };
+    applyOptionalCreateTimestamps(row, input);
+
     const { data, error } = await getSupabaseAdmin()
       .from('saving_transactions')
-      .insert({
-        id: input.id,
-        user_id: input.userId,
-        goal_id: input.goalId,
-        amount: input.amount,
-        date: input.date,
-        source_account_key: input.sourceAccountKey,
-      })
+      .insert(row)
       .select('*')
       .single();
 

@@ -26,3 +26,8 @@ export async function wipeMyData(req: Request, res: Response): Promise<void> {
   await userService.wipeUserData(req.auth!.userId);
   res.status(204).send();
 }
+
+export async function deleteMe(req: Request, res: Response): Promise<void> {
+  await userService.deleteAccount(req.auth!.userId);
+  res.status(204).send();
+}

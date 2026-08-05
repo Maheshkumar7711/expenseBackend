@@ -9,6 +9,10 @@ import type {
 import { isUniqueViolation } from '../utils/dbErrors';
 import { withDbRetry } from '../utils/dbRetry';
 import { isActiveRow, softDeletePatch } from '../utils/softDelete';
+import {
+  applyOptionalCreateTimestamps,
+  type OptionalCreateTimestamps,
+} from '../utils/createTimestamps';
 
 interface PreferencesRow {
   user_id: string;
@@ -207,7 +211,7 @@ async function findCustomCategoryByIdInternal(
   return data ? mapCustomCategoryRow(data as CustomCategoryRow) : null;
 }
 
-export interface CreateCustomCategoryInput {
+export interface CreateCustomCategoryInput extends OptionalCreateTimestamps {
   id: string;
   userId: string;
   name: string;
@@ -223,14 +227,17 @@ export async function createCustomCategory(
 async function createCustomCategoryInternal(
   input: CreateCustomCategoryInput,
 ): Promise<CustomCategoryRecord> {
+  const row: Record<string, unknown> = {
+    id: input.id,
+    user_id: input.userId,
+    name: input.name,
+    linked_to_key: input.linkedToKey,
+  };
+  applyOptionalCreateTimestamps(row, input);
+
   const { data, error } = await getSupabaseAdmin()
     .from('custom_categories')
-    .insert({
-      id: input.id,
-      user_id: input.userId,
-      name: input.name,
-      linked_to_key: input.linkedToKey,
-    })
+    .insert(row)
     .select('*')
     .single();
 

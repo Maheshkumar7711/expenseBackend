@@ -78,6 +78,8 @@ export async function applyBackupPayloadToLive(
       userId,
       name: cat.name,
       linkedToKey: cat.linkedToKey,
+      createdAt: cat.updatedAt,
+      updatedAt: cat.updatedAt,
     });
   }
 
@@ -96,6 +98,8 @@ export async function applyBackupPayloadToLive(
         bankName: account.bankName,
         bankKey: account.bankKey,
         iconKey: account.iconKey,
+        createdAt: account.updatedAt,
+        updatedAt: account.updatedAt,
       });
     }
   }
@@ -113,6 +117,8 @@ export async function applyBackupPayloadToLive(
       description: event.description,
       startDate: event.startDate,
       endDate: event.endDate,
+      createdAt: event.updatedAt,
+      updatedAt: event.updatedAt,
     });
   }
 
@@ -127,6 +133,8 @@ export async function applyBackupPayloadToLive(
       iconKey: goal.iconKey,
       tags: goal.tags ?? [],
       achieved: goal.achieved ?? false,
+      createdAt: goal.updatedAt,
+      updatedAt: goal.updatedAt,
     });
   }
 
@@ -138,6 +146,8 @@ export async function applyBackupPayloadToLive(
       amount: saving.amount,
       date: saving.date,
       sourceAccountKey: saving.sourceAccountKey,
+      createdAt: saving.updatedAt,
+      updatedAt: saving.updatedAt,
     });
   }
 
@@ -149,6 +159,8 @@ export async function applyBackupPayloadToLive(
       amount: budget.amount,
       monthOnly: budget.monthOnly,
       period: budget.period ?? null,
+      createdAt: budget.updatedAt,
+      updatedAt: budget.updatedAt,
     });
   }
 
@@ -168,6 +180,8 @@ export async function applyBackupPayloadToLive(
       date: reminder.date,
       time: reminder.time,
       interval: reminder.interval,
+      createdAt: reminder.updatedAt,
+      updatedAt: reminder.updatedAt,
     });
   }
 
@@ -194,6 +208,8 @@ export async function applyBackupPayloadToLive(
       source: tx.source ?? null,
       travelCurrencyCode: tx.travelCurrencyCode ?? null,
       travelAmountForeign: tx.travelAmountForeign ?? null,
+      createdAt: tx.updatedAt,
+      updatedAt: tx.updatedAt,
     });
   }
 }

@@ -1,3 +1,4 @@
+import { applyOptionalCreateTimestamps, type OptionalCreateTimestamps } from '../utils/createTimestamps';
 import { getSupabaseAdmin } from '../integrations/supabaseClient';
 import { InternalServerError } from '../errors';
 import { isUniqueViolation } from '../utils/dbErrors';
@@ -212,7 +213,7 @@ export async function findTransactionById(
   return runSupabaseQuery(async () => findTransactionByIdInternal(userId, transactionId));
 }
 
-export interface CreateTransactionInput {
+export interface CreateTransactionInput extends OptionalCreateTimestamps {
   id: string;
   userId: string;
   transactionType: TransactionType;
@@ -240,31 +241,34 @@ export async function createTransaction(
   input: CreateTransactionInput,
 ): Promise<TransactionRecord> {
   return runSupabaseQuery(async () => {
+    const row: Record<string, unknown> = {
+      id: input.id,
+      user_id: input.userId,
+      transaction_type: input.transactionType,
+      amount: input.amount,
+      category_key: input.categoryKey ?? null,
+      selected_account: input.selectedAccount ?? null,
+      selected_pay_from: input.selectedPayFrom ?? null,
+      selected_pay_to: input.selectedPayTo ?? null,
+      selected_people_pay_from: input.selectedPeoplePayFrom ?? null,
+      selected_people_pay_to: input.selectedPeoplePayTo ?? null,
+      people_mode: input.peopleMode ?? null,
+      date: input.date,
+      description: input.description ?? null,
+      tags: input.tags ?? [],
+      receipt_url: input.receiptUrl ?? null,
+      location: input.location ?? null,
+      linked_event_id: input.linkedEventId ?? null,
+      recurrence: input.recurrence ?? null,
+      source: input.source ?? null,
+      travel_currency_code: input.travelCurrencyCode ?? null,
+      travel_amount_foreign: input.travelAmountForeign ?? null,
+    };
+    applyOptionalCreateTimestamps(row, input);
+
     const { data, error } = await getSupabaseAdmin()
       .from('transactions')
-      .insert({
-        id: input.id,
-        user_id: input.userId,
-        transaction_type: input.transactionType,
-        amount: input.amount,
-        category_key: input.categoryKey ?? null,
-        selected_account: input.selectedAccount ?? null,
-        selected_pay_from: input.selectedPayFrom ?? null,
-        selected_pay_to: input.selectedPayTo ?? null,
-        selected_people_pay_from: input.selectedPeoplePayFrom ?? null,
-        selected_people_pay_to: input.selectedPeoplePayTo ?? null,
-        people_mode: input.peopleMode ?? null,
-        date: input.date,
-        description: input.description ?? null,
-        tags: input.tags ?? [],
-        receipt_url: input.receiptUrl ?? null,
-        location: input.location ?? null,
-        linked_event_id: input.linkedEventId ?? null,
-        recurrence: input.recurrence ?? null,
-        source: input.source ?? null,
-        travel_currency_code: input.travelCurrencyCode ?? null,
-        travel_amount_foreign: input.travelAmountForeign ?? null,
-      })
+      .insert(row)
       .select('*')
       .single();
 

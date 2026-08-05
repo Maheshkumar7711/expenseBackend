@@ -229,6 +229,66 @@ export async function wipeUserData(clerkUserId: string): Promise<void> {
   setCachedUser(clerkUserId, updated);
 }
 
+function isClerkUserNotFound(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+  const clerkError = error as {
+    status?: number;
+    errors?: Array<{ code?: string; message?: string }>;
+  };
+  if (clerkError.status === 404) {
+    return true;
+  }
+  return (
+    clerkError.errors?.some(
+      (entry) =>
+        entry.code === 'resource_not_found' ||
+        entry.message?.toLowerCase().includes('not found'),
+    ) ?? false
+  );
+}
+
+async function deleteClerkUserOrThrow(clerkUserId: string): Promise<void> {
+  try {
+    await getClerkClient().users.deleteUser(clerkUserId);
+  } catch (error) {
+    if (isClerkUserNotFound(error)) {
+      return;
+    }
+    getLogger().error(
+      { clerkUserId, error: error instanceof Error ? error.message : String(error) },
+      'Clerk user delete failed during account deletion',
+    );
+    throw error;
+  }
+}
+
+/**
+ * Permanently deletes the signed-in user: storage, DB row (cascade), and Clerk user.
+ * Idempotent — safe to retry after partial completion.
+ */
+export async function deleteAccount(clerkUserId: string): Promise<void> {
+  const existing = await userRepository.findUserByClerkId(clerkUserId);
+
+  if (existing) {
+    await deleteUserUploads(clerkUserId);
+    await userRepository.deleteUserByClerkId(clerkUserId);
+    invalidateUserCache(clerkUserId);
+  } else {
+    try {
+      await deleteUserUploads(clerkUserId);
+    } catch (error) {
+      getLogger().warn(
+        { clerkUserId, error: error instanceof Error ? error.message : String(error) },
+        'orphaned upload cleanup during account deletion failed',
+      );
+    }
+  }
+
+  await deleteClerkUserOrThrow(clerkUserId);
+}
+
 /** Idempotent cleanup when Clerk deletes a user (webhook). Cascades child rows via FK. */
 export async function deleteUserByClerkId(clerkUserId: string): Promise<void> {
   const existing = await userRepository.findUserByClerkId(clerkUserId);
