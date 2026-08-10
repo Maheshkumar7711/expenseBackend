@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { moneyAmountFiniteSchema } from './moneySchemas';
 
 const accountTypeSchema = z.enum(['cash', 'bank', 'person']);
 
@@ -11,7 +12,7 @@ export const createAccountBodySchema = z
     id: z.string().trim().min(1).max(128).optional(),
     type: accountTypeSchema,
     name: z.string().trim().min(1).max(200),
-    openingBalance: z.number().finite(),
+    openingBalance: moneyAmountFiniteSchema,
     deactivated: z.boolean().optional(),
     bankName: z.string().trim().max(200).optional(),
     bankKey: z.string().trim().max(128).optional(),
@@ -23,7 +24,7 @@ export const updateAccountBodySchema = z
   .object({
     type: accountTypeSchema.optional(),
     name: z.string().trim().min(1).max(200).optional(),
-    openingBalance: z.number().finite().optional(),
+    openingBalance: moneyAmountFiniteSchema.optional(),
     deactivated: z.boolean().optional(),
     bankName: z.string().trim().max(200).nullable().optional(),
     bankKey: z.string().trim().max(128).nullable().optional(),

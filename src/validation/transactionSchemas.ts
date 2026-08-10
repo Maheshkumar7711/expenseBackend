@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { moneyAmountSchema, moneyAmountNonNegativeSchema } from './moneySchemas';
 
 const transactionTypeSchema = z.enum(['expense', 'income', 'transfer', 'people']);
 const peopleModeSchema = z.enum(['pay', 'receive', 'lend', 'borrow']);
@@ -15,7 +16,7 @@ export const recurrenceSchema = z
 const transactionBodyFields = {
   id: z.string().trim().min(1).max(128).optional(),
   transactionType: transactionTypeSchema,
-  amount: z.number().finite().positive(),
+  amount: moneyAmountSchema,
   categoryKey: z.string().trim().max(128).nullable().optional(),
   selectedAccount: z.string().trim().max(128).nullable().optional(),
   selectedPayFrom: z.string().trim().max(128).nullable().optional(),
@@ -32,7 +33,7 @@ const transactionBodyFields = {
   recurrence: recurrenceSchema.nullable().optional(),
   source: z.literal('atm').optional(),
   travelCurrencyCode: z.string().trim().max(8).nullable().optional(),
-  travelAmountForeign: z.number().finite().nullable().optional(),
+  travelAmountForeign: moneyAmountNonNegativeSchema.nullable().optional(),
 };
 
 export const transactionIdParamsSchema = z.object({
@@ -44,7 +45,7 @@ export const createTransactionBodySchema = z.object(transactionBodyFields).stric
 export const updateTransactionBodySchema = z
   .object({
     transactionType: transactionTypeSchema.optional(),
-    amount: z.number().finite().positive().optional(),
+    amount: moneyAmountSchema.optional(),
     categoryKey: z.string().trim().max(128).nullable().optional(),
     selectedAccount: z.string().trim().max(128).nullable().optional(),
     selectedPayFrom: z.string().trim().max(128).nullable().optional(),
@@ -61,7 +62,7 @@ export const updateTransactionBodySchema = z
     recurrence: recurrenceSchema.nullable().optional(),
     source: z.literal('atm').nullable().optional(),
     travelCurrencyCode: z.string().trim().max(8).nullable().optional(),
-    travelAmountForeign: z.number().finite().nullable().optional(),
+    travelAmountForeign: moneyAmountNonNegativeSchema.nullable().optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

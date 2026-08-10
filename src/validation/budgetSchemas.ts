@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { moneyAmountSchema } from './moneySchemas';
 
 export const budgetIdParamsSchema = z.object({
   id: z.string().trim().min(1).max(128),
@@ -8,7 +9,7 @@ export const createBudgetBodySchema = z
   .object({
     id: z.string().trim().min(1).max(128).optional(),
     categoryKey: z.string().trim().min(1).max(128),
-    amount: z.number().finite().positive(),
+    amount: moneyAmountSchema,
     monthOnly: z.boolean(),
     period: z.string().trim().regex(/^\d{4}-\d{2}$/).optional(),
   })
@@ -17,7 +18,7 @@ export const createBudgetBodySchema = z
 export const updateBudgetBodySchema = z
   .object({
     categoryKey: z.string().trim().min(1).max(128).optional(),
-    amount: z.number().finite().positive().optional(),
+    amount: moneyAmountSchema.optional(),
     monthOnly: z.boolean().optional(),
     period: z.string().trim().regex(/^\d{4}-\d{2}$/).nullable().optional(),
   })

@@ -32,7 +32,7 @@ create table if not exists public.accounts (
   clerk_user_id text not null references public.users (clerk_user_id) on delete cascade,
   type text not null check (type in ('cash', 'bank', 'person')),
   name text not null,
-  opening_balance numeric(18, 2) not null default 0,
+  opening_balance numeric(18, 3) not null default 0,
   deactivated boolean not null default false,
   bank_name text,
   bank_key text,
@@ -62,7 +62,7 @@ create table if not exists public.transactions (
   clerk_user_id text not null references public.users (clerk_user_id) on delete cascade,
   transaction_type text not null
     check (transaction_type in ('expense', 'income', 'transfer', 'people')),
-  amount numeric(18, 2) not null,
+  amount numeric(18, 3) not null,
   category_key text,
   selected_account text,
   selected_pay_from text,
@@ -79,7 +79,7 @@ create table if not exists public.transactions (
   recurrence jsonb,
   source text,
   travel_currency_code text,
-  travel_amount_foreign numeric(18, 2),
+  travel_amount_foreign numeric(18, 3),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (clerk_user_id, id)
